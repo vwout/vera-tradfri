@@ -1,0 +1,73 @@
+<?xml version="1.0"?>
+<implementation>
+
+    <files>L_TradfriGW.lua</files>
+
+    <startup>init</startup>
+
+    <actionList>
+        <action>
+            <serviceId>urn:upnp-org:serviceId:tradfri-gw1</serviceId>
+            <name>Reboot</name>
+            <run>
+                Reboot(lul_device)
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:upnp-org:serviceId:tradfri-gw1</serviceId>
+            <name>FactoryReset</name>
+            <run>
+                FactoryReset(lul_device)
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:upnp-org:serviceId:tradfri-gw1</serviceId>
+            <name>SetCommissioningMode</name>
+            <run>
+                SetCommissioningMode(lul_device, lul_settings.commissioning_timeout)
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:upnp-org:serviceId:SwitchPower1</serviceId>
+            <name>SetTarget</name>
+            <run>
+                SwitchPower_SetTarget(lul_device,lul_settings.newTargetValue)
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:upnp-org:serviceId:Dimming1</serviceId>
+            <name>SetLoadLevelTarget</name>
+            <run>
+                Dimming_SetLoadLevelTarget(lul_device,lul_settings.newLoadlevelTarget)
+            </run>
+        </action>
+		<action>
+		  <serviceId>urn:micasaverde-com:serviceId:HaDevice1</serviceId>
+		  <name>ToggleState</name>
+		  <run>
+              HaDevice_ToggleState(lul_device)
+		  </run>
+		</action>
+        <action>
+            <serviceId>urn:micasaverde-com:serviceId:Color1</serviceId>
+            <name>SetColorRGB</name>
+            <run>
+                Color_SetColorRGB(lul_device,lul_settings.newColorRGBTarget)
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:micasaverde-com:serviceId:Color1</serviceId>
+            <name>SetColor</name>
+            <run>
+                Color_SetColor(lul_device,lul_settings.newColorTarget)
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:micasaverde-com:serviceId:SecuritySensor1</serviceId>
+            <name>SetArmed</name>
+            <run>
+                SecuritySensor_SetArmed(lul_device,lul_settings.newArmedValue)
+            </run>
+        </action>
+    </actionList>
+</implementation>

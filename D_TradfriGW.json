@@ -1,0 +1,121 @@
+{
+  "flashicon": "icons/IkeaTradfri.png",
+  "default_icon": "icons/IkeaTradfri.png",
+  "state_icons": [
+    "icons/IkeaTradfri.png",
+    "icons/IkeaTradfri-disconnected.png",
+    {
+      "img": "icons/IkeaTradfri-disconnected.png",
+      "conditions": [
+        {
+          "service": "urn:upnp-org:serviceId:tradfri-gw1",
+          "variable": "Connected",
+          "operator": "==",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "img": "icons/IkeaTradfri.png\",\n    \"icons/IkeaTradfri-dis",
+      "conditions": [
+        {
+          "service": "urn:upnp-org:serviceId:tradfri-gw1",
+          "variable": "Connected",
+          "operator": "==",
+          "value": 1
+        }
+      ]
+    }
+  ],
+  "x": "2",
+  "y": "4",
+  "inScene": "1",
+  "doc_url": {
+    "doc_language": 1,
+    "doc_manual": 1,
+    "doc_version": 1,
+    "doc_platform": 0,
+    "doc_page": "https:\/\/github.com\/vwout\/vera-tradfri",
+    "doc_forced_url": {
+      "text": "http:\/\/github.com\/vwout\/vera-tradfri"
+    }
+  },
+  "ToggleButton": 1,
+  "Tabs": [
+    {
+      "Label": {
+        "lang_tag": "tabname_control",
+        "text": "Control"
+      },
+      "Position": "1",
+      "TopNavigationTab": "1",
+      "TabType": "flash",
+      "SceneGroup": [
+        {
+          "id": "1",
+          "top": "0",
+          "left": "0",
+          "x": "2",
+          "y": "1"
+        }
+      ],
+      "ControlGroup": [
+        {
+          "id": "1",
+          "isSingle": "1",
+          "scenegroup": "1"
+        }
+      ],
+      "Control": [
+      ]
+    },
+    {
+      "Label": {
+        "lang_tag": "advanced",
+        "text": "Advanced"
+      },
+      "Position": 1,
+      "TabType": "javascript",
+      "ScriptName": "shared.js",
+      "Function": "advanced_device"
+    },
+    {
+      "Label": {
+        "lang_tag": "logs",
+        "text": "Logs"
+      },
+      "Position": 2,
+      "TabType": "javascript",
+      "ScriptName": "shared.js",
+      "Function": "device_logs"
+    },
+    {
+      "Label": {
+        "lang_tag": "notifications",
+        "text": "Notifications"
+      },
+      "Position": 3,
+      "TabType": "javascript",
+      "ScriptName": "shared.js",
+      "Function": "device_notifications"
+    },
+    {
+      "Label": {
+        "lang_tag": "ui7_device_scenes",
+        "text": "Scenes"
+      },
+      "Position": 4,
+      "TabType": "javascript",
+      "ScriptName": "shared.js",
+      "Function": "device_scenes"
+    }
+  ],
+  "sceneList": {
+  },
+  "eventList": {
+  },
+  "eventList2": {
+  },
+  "DeviceType": "urn:schemas-upnp-org:device:tradfri-gw:1",
+  "device_type": "urn:schemas-upnp-org:device:tradfri-gw:1"
+}
