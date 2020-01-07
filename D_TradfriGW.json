@@ -1,11 +1,11 @@
 {
-  "flashicon": "icons/IkeaTradfri.png",
-  "default_icon": "icons/IkeaTradfri.png",
+  "flashicon": "https://cdn.jsdelivr.net/gh/vwout/vera-tradfri/icons/IkeaTradfri.png",
+  "default_icon": "https://cdn.jsdelivr.net/gh/vwout/vera-tradfri/icons/IkeaTradfri.png",
   "state_icons": [
-    "icons/IkeaTradfri.png",
-    "icons/IkeaTradfri-disconnected.png",
+    "IkeaTradfri.png",
+    "IkeaTradfri-disconnected.png",
     {
-      "img": "icons/IkeaTradfri-disconnected.png",
+      "img": "https://cdn.jsdelivr.net/gh/vwout/vera-tradfri/icons/IkeaTradfri-disconnected.png",
       "conditions": [
         {
           "service": "urn:upnp-org:serviceId:tradfri-gw1",
@@ -16,7 +16,7 @@
       ]
     },
     {
-      "img": "icons/IkeaTradfri.png\",\n    \"icons/IkeaTradfri-dis",
+      "img": "https://cdn.jsdelivr.net/gh/vwout/vera-tradfri/icons/IkeaTradfri.png",
       "conditions": [
         {
           "service": "urn:upnp-org:serviceId:tradfri-gw1",
