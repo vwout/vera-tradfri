@@ -67,6 +67,90 @@
         }
       ],
       "Control": [
+        {
+          "ControlGroup": "1",
+          "ControlType": "button",
+          "top": "1",
+          "left": "0",
+          "Label": {
+            "lang_tag": "tradfri_reboot",
+            "text": "Reboot"
+          },
+          "Display": {
+            "Service": "urn:upnp-org:serviceId:tradfri-gw1",
+            "Variable": "Connected",
+            "Value": "1",
+            "Top": 10,
+            "Left": 10,
+            "Width": 75,
+            "Height": 20
+          },
+          "Command": {
+            "Service": "urn:upnp-org:serviceId:tradfri-gw1",
+            "Action": "Reboot",
+            "Parameters": []
+          }
+        },
+        {
+          "ControlGroup": 1,
+          "ControlType": "line_break"
+        },
+        {
+          "ControlGroup": "1",
+          "ControlType": "button",
+          "top": "2",
+          "left": "0",
+          "Label": {
+            "lang_tag": "tradfri_factory_reset",
+            "text": "Factory Reset"
+          },
+          "Display": {
+            "Service": "urn:upnp-org:serviceId:tradfri-gw1",
+            "Variable": "Connected",
+            "Value": "1",
+            "Top": 40,
+            "Left": 10,
+            "Width": 105,
+            "Height": 20
+          },
+          "Command": {
+            "Service": "urn:upnp-org:serviceId:tradfri-gw1",
+            "Action": "FactoryReset",
+            "Parameters": []
+          }
+        },
+        {
+          "ControlGroup": 1,
+          "ControlType": "line_break"
+        },
+        {
+          "ControlGroup": "1",
+          "ControlType": "button",
+          "top": "3",
+          "left": "0",
+          "Label": {
+            "lang_tag": "tradfri_commission",
+            "text": "Commission"
+          },
+          "Display": {
+            "Service": "urn:upnp-org:serviceId:tradfri-gw1",
+            "Variable": "Connected",
+            "Value": "1",
+            "Top": 70,
+            "Left": 10,
+            "Width": 95,
+            "Height": 20
+          },
+          "Command": {
+            "Service": "urn:upnp-org:serviceId:tradfri-gw1",
+            "Action": "SetCommissioningMode",
+            "Parameters": [
+              {
+                "commissioning_timeout": 60
+              }
+            ]
+          }
+        }
       ]
     },
     {

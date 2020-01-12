@@ -165,7 +165,7 @@ local function log(message)
   luup.log("TradfriGW #" .. GWDeviceID .. ": " .. (message or ""))
 end
 
-local function isempty(s)
+local function is_empty(s)
   return (s == nil) or (s == "")
 end
 
@@ -262,12 +262,12 @@ end
 function initTradfri()
   local initDelay = 10 + math.random(10)  -- Start initialization after 10 .. 20 seconds
 
-  if (isempty(Config.GW_Identity)) or (isempty(Config.GW_Psk)) then
+  if (is_empty(Config.GW_Identity)) or (is_empty(Config.GW_Psk)) then
       -- Obtain Identity/Psk
       local securityCode = getDeviceVar("SecurityCode")
 
-      if (not isempty(securityCode)) then
-        if (isempty(Config.GW_Identity)) then
+      if (not is_empty(securityCode)) then
+        if (is_empty(Config.GW_Identity)) then
           Config.GW_Identity = string.format("Vera-%s", luup.pk_accesspoint)
           setLuupVar("Identity", Config.GW_Identity)
         end
@@ -288,7 +288,6 @@ function initTradfri()
     -- TODO: Load devices
     tradfriCommand(GW.METHOD_GET, {GW.ROOT_DEVICES})
   end
-
 end
 
 
@@ -305,7 +304,7 @@ function init(lul_device)
   Config.GW_Psk                = getLuupVar("Psk")
   getDeviceVar("SecurityCode")  -- Make sure the variable is created
 
-  if (not isempty(Config.GW_Ip)) and (not isempty(Config.GW_Port)) then
+  if (not is_empty(Config.GW_Ip)) and (not is_empty(Config.GW_Port)) then
     luup.call_delay("initTradfri", 10 + math.random(10), "")
   else
     log("Unable to start the Tradfri plugin. Set the IP(address) attribute.")
@@ -320,19 +319,27 @@ end
 -- ServiceId: urn:upnp-org:serviceId:tradfri-gw1
 -- Action: Reboot
 function Reboot(lul_device)
-  log(string.format("TODO Reboot: %s for device %d", newArmedValue, lul_device))
+  if GWDeviceID == lul_device then
+    tradfriCommand(GW.METHOD_POST, {GW.ROOT_GATEWAY, GW.ATTR_GATEWAY_REBOOT})
+  end
 end
 
 -- ServiceId: urn:upnp-org:serviceId:tradfri-gw1
 -- Action: FactoryReset
 function FactoryReset(lul_device)
-  log(string.format("TODO FactoryReset: %s for device %d", newArmedValue, lul_device))
+  if GWDeviceID == lul_device then
+    tradfriCommand(GW.METHOD_POST, {GW.ROOT_GATEWAY, GW.ATTR_GATEWAY_FACTORY_DEFAULTS})
+  end
 end
 
 -- ServiceId: urn:upnp-org:serviceId:tradfri-gw1
 -- Action: SetCommissioningMode
 function SetCommissioningMode(lul_device, timeout)
-  log(string.format("TODO SetCommissioningMode: timeout %d for device %d", timeout, lul_device))
+  if GWDeviceID == lul_device then
+    local payload = {}
+    payload[GW.ATTR_COMMISSIONING_MODE] = timeout
+    tradfriCommand(GW.METHOD_PUT, {GW.ROOT_GATEWAY, GW.ATTR_GATEWAY_INFO}, payload)
+  end
 end
 
 -- ServiceId: urn:upnp-org:serviceId:SwitchPower1
