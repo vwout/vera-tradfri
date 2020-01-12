@@ -27,6 +27,13 @@
                 SetCommissioningMode(lul_device, lul_settings.commissioning_timeout)
             </run>
         </action>
+		<action>
+			<serviceId>urn:upnp-org:serviceId:tradfri-gw1</serviceId>
+			<name>SetDebug</name>
+			<run>
+			    setDebugMode(lul_device, lul_settings.newDebugMode)
+			</run>
+		</action>
         <action>
             <serviceId>urn:upnp-org:serviceId:SwitchPower1</serviceId>
             <name>SetTarget</name>

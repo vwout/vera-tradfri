@@ -152,7 +152,8 @@ local Config = {
   GW_Ip               = "",
   GW_Port             = 5684,
   GW_Identity         = "",
-  GW_Psk              = ""
+  GW_Psk              = "",
+  GW_DebugMode        = false
 }
 local DeviceData = {}
 
@@ -163,6 +164,12 @@ local DeviceData = {}
 
 local function log(message)
   luup.log("TradfriGW #" .. GWDeviceID .. ": " .. (message or ""))
+end
+
+local function debug(message)
+  if Config.GW_DebugMode then
+    luup.log("TradfriGW #" .. GWDeviceID .. " DEBUG: " .. (message or ""))
+  end
 end
 
 local function is_empty(s)
@@ -302,6 +309,7 @@ function init(lul_device)
   Config.GW_Port               = tonumber(getDeviceVar("Port", Config.GW_Port, 1025, 65535))
   Config.GW_Identity           = getLuupVar("Identity")
   Config.GW_Psk                = getLuupVar("Psk")
+  Config.GW_DebugMode          = getDeviceVar("Debug", 0)
   getDeviceVar("SecurityCode")  -- Make sure the variable is created
 
   if (not is_empty(Config.GW_Ip)) and (not is_empty(Config.GW_Port)) then
@@ -339,6 +347,20 @@ function SetCommissioningMode(lul_device, timeout)
     local payload = {}
     payload[GW.ATTR_COMMISSIONING_MODE] = timeout
     tradfriCommand(GW.METHOD_PUT, {GW.ROOT_GATEWAY, GW.ATTR_GATEWAY_INFO}, payload)
+  end
+end
+
+-- ServiceId: urn:upnp-org:serviceId:tradfri-gw1
+-- Action: SetDebug
+local function setDebugMode(lul_device, newDebugMode)
+  if GWDeviceID == lul_device then
+    setLuupVar("Debug", tonumber(newDebugMode) or 0)
+
+    if (newDebugMode == 1) then
+	  Config.GW_DebugMode=true
+    else
+	  Config.GW_DebugMode=false
+    end
   end
 end
 

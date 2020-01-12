@@ -68,6 +68,79 @@
       ],
       "Control": [
         {
+          "ControlType": "label",
+          "top": "0",
+          "left": "0",
+          "text_align": "left",
+          "Label": {
+            "lang_tag": "debug_label",
+            "text": "Debugging:"
+          },
+          "Display": {
+            "Top": 10,
+            "Left": 150,
+            "Width": 50,
+            "Height": 20
+          }
+        },
+        {
+          "ControlType": "multi_state_button",
+          "top": "0",
+          "left": "0",
+          "Display": {
+            "Top": 30,
+            "Left": 150
+          },
+          "states": [
+            {
+              "Label": {
+                "lang_tag": "debug_on",
+                "text": "Active"
+              },
+              "ControlGroup": "1",
+              "Display": {
+                "Service": "urn:upnp-org:serviceId:tradfri-gw1",
+                "Variable": "Debug",
+                "Value": "1"
+              },
+              "Command": {
+                "Service": "urn:upnp-org:serviceId:tradfri-gw1",
+                "Action": "SetDebug",
+                "Parameters": [
+                  {
+                    "Name": "newDebugMode",
+                    "Value": "0"
+                  }
+                ]
+              },
+              "ControlCode": "debug_on"
+            },
+            {
+              "Label": {
+                "lang_tag": "debug_off",
+                "text": "Inactive"
+              },
+              "ControlGroup": "1",
+              "Display": {
+                "Service": "urn:upnp-org:serviceId:tradfri-gw1",
+                "Variable": "Debug",
+                "Value": "0"
+              },
+              "Command": {
+                "Service": "urn:upnp-org:serviceId:tradfri-gw1",
+                "Action": "SetDebug",
+                "Parameters": [
+                  {
+                    "Name": "newDebugMode",
+                    "Value": "1"
+                  }
+                ]
+              },
+              "ControlCode": "debug_off"
+            }
+          ]
+        },
+        {
           "ControlGroup": "1",
           "ControlType": "button",
           "top": "1",
