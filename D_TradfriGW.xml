@@ -8,9 +8,9 @@
     <deviceType>urn:schemas-upnp-org:device:tradfri-gw:1</deviceType>
     <staticJson>D_TradfriGW.json</staticJson>
     <friendlyName>Tradfri Gateway</friendlyName>
-    <manufacturer>IKEA</manufacturer>
-    <manufacturerURL>http://ikea.com/</manufacturerURL>
-    <modelDescription>Vera plugin for IKEA Tradfri</modelDescription>
+    <manufacturer>vwout</manufacturer>
+    <manufacturerURL>https://github.com/vwout/vera-tradfri</manufacturerURL>
+    <modelDescription>Vera plugin for IKEA Tradfri using a Tradfri gateway</modelDescription>
     <modelName>Tradfri</modelName>
     <modelNumber>1.0</modelNumber>
 
