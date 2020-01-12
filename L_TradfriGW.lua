@@ -1,16 +1,6 @@
 local json = require("dkjson")
 local coap = require("coap")
 
----
--- ServiceId strings for the different sensors
-local GWDeviceSID         = "urn:upnp-org:serviceId:tradfri-gw1"             -- Main device serviceId
-local GWSwitchPowerSID    = "urn:upnp-org:serviceId:SwitchPower1"
-local GWDimmingSID        = "urn:upnp-org:serviceId:Dimming1"
-local GWColorSID          = "urn:micasaverde-com:serviceId:Color1"
-local GWSecuritySensorSID = "urn:micasaverde-com:serviceId:SecuritySensor1"
-
-local GWDeviceType        = "urn:schemas-upnp-org:device:tradfri-gw:1"
-
 ------------------------------------------------------------------------------------
 -- Tradfri constants
 ------------------------------------------------------------------------------------
@@ -37,7 +27,12 @@ GW.ATTR_START_BLINDS = "15015"
 GW.ATTR_ALEXA_PAIR_STATUS = "9093"
 GW.ATTR_AUTH = "9063"
 GW.ATTR_APPLICATION_TYPE = "5750"
-GW.ATTR_APPLICATION_TYPE_BLIND = 7
+GW.APPLICATION_TYPE = {}
+GW.APPLICATION_TYPE.REMOTE = 1
+GW.APPLICATION_TYPE.LIGHT = 2
+GW.APPLICATION_TYPE.OUTLET = 3
+GW.APPLICATION_TYPE.MOTION = 4
+GW.APPLICATION_TYPE.BLIND = 7
 
 GW.ATTR_BLIND_CURRENT_POSITION = "5536"
 GW.ATTR_BLIND_TRIGGER = "5523"
@@ -52,6 +47,10 @@ GW.ATTR_CURRENT_TIME_UNIX = "9059"
 GW.ATTR_CURRENT_TIME_ISO8601 = "9060"
 
 GW.ATTR_DEVICE_INFO = "3"
+GW.DEVICE_INFO = {}
+GW.DEVICE_INFO.BRAND = "0"
+GW.DEVICE_INFO.NAME = "1"
+GW.DEVICE_INFO.FIRMWARE_VERSION = "3"
 
 GW.ATTR_GATEWAY_ID_2 = "9100"  -- stored in IKEA app code as gateway id
 GW.ATTR_GATEWAY_TIME_SOURCE = "9071"
@@ -144,18 +143,28 @@ GW.ATTR_TRANSITION_TIME = "5712"
 
 GW.ATTR_USE_CURRENT_LIGHT_SETTINGS = "9070"
 
+---
+-- ServiceId strings for the different sensors
+local GWDeviceSID         = "urn:upnp-org:serviceId:tradfri-gw1"             -- Main device serviceId
+local GWSwitchPowerSID    = "urn:upnp-org:serviceId:SwitchPower1"
+local GWDimmingSID        = "urn:upnp-org:serviceId:Dimming1"
+local GWColorSID          = "urn:micasaverde-com:serviceId:Color1"
+local GWSecuritySensorSID = "urn:micasaverde-com:serviceId:SecuritySensor1"
+
+local GWDeviceType        = "urn:schemas-upnp-org:device:tradfri-gw:1"
+
 
 ---
 -- 'global' program variables assigned in init()
 local GWDeviceID   -- Luup device ID
 local Config = {
-  GW_Ip               = "",
-  GW_Port             = 5684,
-  GW_Identity         = "",
-  GW_Psk              = "",
-  GW_DebugMode        = false
+  GW_Ip         = "",
+  GW_Port       = 5684,
+  GW_Identity   = "",
+  GW_Psk        = "",
+  GW_DebugMode  = false,
+  GW_Devices    = {},
 }
-local DeviceData = {}
 
 
 ------------------------------------------------------------------------------------
@@ -174,6 +183,15 @@ end
 
 local function is_empty(s)
   return (s == nil) or (s == "")
+end
+
+local function is_array(t)
+  local i = 0
+  for _ in pairs(t) do
+      i = i + 1
+      if t[i] == nil then return false end
+  end
+  return true
 end
 
 local function getLuupVar(name, service, device)
@@ -213,8 +231,141 @@ local function getDeviceVar(name, default, lower, upper, service, device)
 	return value
 end
 
-function tradfriCallback(payload_str)
-  log("DEBUG: tradfriCallback " .. payload_str)
+------------------------------------------------------------------------------------
+-- Main logic
+------------------------------------------------------------------------------------
+
+function createOrUpdateRemote(payload, child_devices)
+  log("TODO: implement Remote device")
+  return false
+end
+
+function createOrUpdateLight(payload, child_devices)
+  local tradfri_id = tostring(payload[GW.ATTR_ID])
+  local tradfri_name = payload[GW.ATTR_NAME] or ""
+  local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
+  if tradfri_name == "" then
+    tradfri_name = tradfri_device_info[GW.DEVICE_INFO.NAME] or "Tradfri Light"
+  end
+
+  if tradfri_id and tradfri_name then
+    local device_attrs = payload[GW.ATTR_LIGHT_CONTROL] or {{}}
+    local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
+    local device_dimming = math.ceil(100 * (device_attrs[1][GW.ATTR_LIGHT_DIMMER] or 0) / 255)
+
+    local data = {
+      tradfri_id = tradfri_id,
+      tradfri_appl_type = GW.APPLICATION_TYPE.LIGHT,
+      tradfri_attr_group = GW.ATTR_LIGHT_CONTROL,
+      tradfri_name = tradfri_name,
+      device_type = "urn:schemas-upnp-org:device:DimmableLight:1",
+      d_xml = "D_DimmableLight1.xml",
+      variables = {
+        "urn:upnp-org:serviceId:SwitchPower1,Status=" .. tostring(device_state),
+        "urn:upnp-org:serviceId:SwitchPower1,Target=" .. tostring(device_state),
+        "urn:upnp-org:serviceId:Dimming1,LoadLevelStatus=" .. tostring(device_dimming),
+        "urn:upnp-org:serviceId:Dimming1,LoadLevelTarget=" .. tostring(device_dimming),
+      }
+    }
+
+    Config.GW_Devices[tradfri_id] = data
+  end
+end
+
+function createOrUpdateOutlet(payload, child_devices)
+  local tradfri_id = tostring(payload[GW.ATTR_ID])
+  local tradfri_name = payload[GW.ATTR_NAME] or ""
+  local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
+  if tradfri_name == "" then
+    tradfri_name = tradfri_device_info[GW.DEVICE_INFO.NAME] or "Tradfri Outlet"
+  end
+
+  if tradfri_id and tradfri_name then
+    local device_attrs = payload[GW.ATTR_SWITCH_PLUG] or {{}}
+    local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
+    --local power_factor = device_attrs[GW.ATTR_SWITCH_POWER_FACTOR] or 0
+
+    local data = {
+      tradfri_id = tradfri_id,
+      tradfri_appl_type = GW.APPLICATION_TYPE.OUTLET,
+      tradfri_attr_group = GW.ATTR_SWITCH_PLUG,
+      tradfri_name = tradfri_name,
+      device_type = "urn:schemas-upnp-org:device:BinaryLight:1",
+      d_xml = "D_BinaryLight1.xml",
+      variables = {
+        "urn:upnp-org:serviceId:SwitchPower1,Status=" .. tostring(device_state),
+        "urn:upnp-org:serviceId:SwitchPower1,Target=" .. tostring(device_state),
+      }
+    }
+
+    Config.GW_Devices[tradfri_id] = data
+  end
+end
+
+function createOrUpdateMotionSensor(payload, child_devices)
+  log("TODO: implement Motion device")
+  return false
+end
+
+function tradfriDevicesCallback(payload_str)
+  debug("tradfriDevicesCallback " .. payload_str)
+  local payload, pos, err = json.decode(payload_str)
+  if err then
+    log(string.format("Parsing payload failed at %d: %s", pos, err))
+  end
+
+  if is_array(payload) then
+    -- Devicelist received, query all individual devices
+
+    -- Clear list of local devices
+    Config.GW_Devices = {}
+
+    for _, v in pairs(payload) do
+      tradfriCommand(GW.METHOD_GET, {GW.ROOT_DEVICES, v})
+    end
+
+    local child_devices = luup.chdev.start(GWDeviceID);
+    for _, d in pairs(Config.GW_Devices) do
+      debug("Add " .. d.tradfri_name .. " (" .. d.tradfri_id .. "), vars=" .. table.concat(d.variables, "\n"))
+
+      luup.chdev.append(
+        GWDeviceID,
+        child_devices,
+        d.tradfri_id,                     -- child id (is altid)
+        d.tradfri_name,                   -- child device description
+        d.device_type,                    -- child device type
+        d.d_xml,                          -- child D-xml file
+        "",                               -- child I-xml file
+        table.concat(d.variables, "\n"),  -- child variables
+        false,                            -- not embedded, child is standalone device
+        false                             -- invisible
+      )
+    end
+
+    luup.chdev.sync(GWDeviceID, child_devices)
+  else
+
+    for k, v in pairs(payload) do
+      if k == GW.ATTR_APPLICATION_TYPE then
+        if v == GW.APPLICATION_TYPE.REMOTE then
+          createOrUpdateRemote(payload, child_devices)
+        elseif v == GW.APPLICATION_TYPE.LIGHT then
+          createOrUpdateLight(payload, child_devices)
+        elseif v == GW.APPLICATION_TYPE.OUTLET then
+          createOrUpdateOutlet(payload, child_devices)
+        elseif v == GW.APPLICATION_TYPE.MOTION then
+          createOrUpdateMotionSensor(payload, child_devices)
+        else
+          log(string.format("Unknown device type received (%d): %s", v, payload_str))
+        end
+      end
+    end
+
+  end
+end
+
+function tradfriGatewayCallback(payload_str)
+  debug("tradfriGatewayCallback " .. payload_str)
 
   setLuupVar("Connected", 1)
   local payload = json.decode(payload_str)
@@ -240,23 +391,38 @@ function tradfriCommand(method, path, payload, identity, psk)
   local path_str = table.concat(path, "/")
   local url = string.format("coaps://%s:%s@%s:%d/%s", identity, psk, Config.GW_Ip, Config.GW_Port, path_str)
 
+  local callback
+  if path[1] == GW.ROOT_GATEWAY then
+    callback = tradfriGatewayCallback
+  elseif path[1] == GW.ROOT_DEVICES then
+    callback = tradfriDevicesCallback
+  else
+    log(string.format("Unable to process command to %d, unknown callback.", path[1]))
+    return
+  end
+
   if method == GW.METHOD_GET then
-    log("GET => " .. path_str)
-    coapResult = coapClient:get(coap.CON, url, tradfriCallback)
+    debug("GET => " .. path_str)
+    coapResult = coapClient:get(coap.CON, url, callback)
   elseif method == GW.METHOD_POST then
     local payload_str = payload
     if type(payload) == 'table' then
       payload_str = json.encode(payload)
     end
 
-    log("POST " .. payload_str .. " => " .. path_str)
-    coapResult = coapClient:post(coap.CON, url, 0, payload_str, tradfriCallback)
+    debug("POST " .. payload_str .. " => " .. path_str)
+    coapResult = coapClient:post(coap.CON, url, 0, payload_str, callback)
   elseif method == GW.METHOD_PUT then
-    --TODO
-    log("TODO put " .. path_str)
+    local payload_str = payload
+    if type(payload) == 'table' then
+      payload_str = json.encode(payload)
+    end
+
+    debug("PUT " .. payload_str .. " => " .. path_str)
+    coapResult = coapClient:put(coap.CON, url, 0, payload_str, callback)
   elseif method == GW.METHOD_OBSERVE then
     --TODO
-    log("TODO observe " .. path_str)
+    log("TODO: observe " .. path_str)
   else
     log("Unable to process command, method '" .. method .. "' is unknown")
   end
@@ -367,7 +533,21 @@ end
 -- ServiceId: urn:upnp-org:serviceId:SwitchPower1
 -- Action: SetTarget
 function SwitchPower_SetTarget(lul_device, newTargetValue)
-  log(string.format("TODO SwitchPower_SetTarget: newTargetValue %d for device %d", newTargetValue, lul_device))
+  newTargetValue = tonumber(newTargetValue)
+
+  local tradfri_id = luup.devices[lul_device].id
+  local tradfri_attr_group = Config.GW_Devices[tradfri_id].tradfri_attr_group
+  if tradfri_id and tradfri_attr_group then
+    local v = (newTargetValue > 0) and "1" or "0"
+    luup.variable_set("urn:upnp-org:serviceId:SwitchPower1", "Target", v, lul_device)
+    luup.variable_set("urn:upnp-org:serviceId:SwitchPower1", "Status", v, lul_device)
+
+    local payload = {}
+    local attrs = {}
+    attrs[GW.ATTR_DEVICE_STATE] = newTargetValue
+    payload[tradfri_attr_group] = {attrs}
+    tradfriCommand(GW.METHOD_PUT, {GW.ROOT_DEVICES, tradfri_id}, payload)
+  end
 end
 
 -- ServiceId: urn:upnp-org:serviceId:Dimming1
