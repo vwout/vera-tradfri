@@ -194,6 +194,13 @@ local function is_array(t)
   return true
 end
 
+local function setLuupAttr(name, value, deviceId)
+  local old = luup.attr_get(name, deviceId)
+  if ((value ~= old) or (old == nil)) then
+	  luup.attr_set(name, value or "", deviceId)
+  end
+end
+
 local function getLuupVar(name, service, device)
   service = service or GWDeviceSID
   device = device or GWDeviceID
@@ -231,6 +238,28 @@ local function getDeviceVar(name, default, lower, upper, service, device)
 	return value
 end
 
+local function findChild(lul_parent, deviceid)
+  for k,v in pairs(luup.devices) do
+    if (v.device_num_parent == lul_parent) then
+	    if (v.id == deviceid) then
+		    return k, v
+	    end
+	  end
+  end
+  return nil, nil
+end
+
+local function getParent(lul_device)
+  return luup.devices[lul_device].device_num_parent
+end
+
+local function getRoot(lul_device)
+  while (getParent(lul_device) > 0) do
+    lul_device = getParent(lul_device)
+  end
+  return lul_device
+end
+
 ------------------------------------------------------------------------------------
 -- Main logic
 ------------------------------------------------------------------------------------
@@ -258,6 +287,7 @@ function createOrUpdateLight(payload, child_devices)
       tradfri_appl_type = GW.APPLICATION_TYPE.LIGHT,
       tradfri_attr_group = GW.ATTR_LIGHT_CONTROL,
       tradfri_name = tradfri_name,
+      sid = GWDimmingSID,
       device_type = "urn:schemas-upnp-org:device:DimmableLight:1",
       d_xml = "D_DimmableLight1.xml",
       variables = {
@@ -265,7 +295,8 @@ function createOrUpdateLight(payload, child_devices)
         "urn:upnp-org:serviceId:SwitchPower1,Target=" .. tostring(device_state),
         "urn:upnp-org:serviceId:Dimming1,LoadLevelStatus=" .. tostring(device_dimming),
         "urn:upnp-org:serviceId:Dimming1,LoadLevelTarget=" .. tostring(device_dimming),
-      }
+      },
+      subcategory = 1
     }
 
     Config.GW_Devices[tradfri_id] = data
@@ -290,12 +321,14 @@ function createOrUpdateOutlet(payload, child_devices)
       tradfri_appl_type = GW.APPLICATION_TYPE.OUTLET,
       tradfri_attr_group = GW.ATTR_SWITCH_PLUG,
       tradfri_name = tradfri_name,
+      sid = GWSwitchPowerSID,
       device_type = "urn:schemas-upnp-org:device:BinaryLight:1",
       d_xml = "D_BinaryLight1.xml",
       variables = {
         "urn:upnp-org:serviceId:SwitchPower1,Status=" .. tostring(device_state),
         "urn:upnp-org:serviceId:SwitchPower1,Target=" .. tostring(device_state),
-      }
+      },
+      subcategory = 1
     }
 
     Config.GW_Devices[tradfri_id] = data
@@ -311,7 +344,8 @@ function tradfriDevicesCallback(payload_str)
   debug("tradfriDevicesCallback " .. payload_str)
   local payload, pos, err = json.decode(payload_str)
   if err then
-    log(string.format("Parsing payload failed at %d: %s", pos, err))
+    log(string.format("Parsing device data failed at %d: %s", pos, err))
+    return false
   end
 
   if is_array(payload) then
@@ -326,7 +360,7 @@ function tradfriDevicesCallback(payload_str)
 
     local child_devices = luup.chdev.start(GWDeviceID);
     for _, d in pairs(Config.GW_Devices) do
-      debug("Add " .. d.tradfri_name .. " (" .. d.tradfri_id .. "), vars=" .. table.concat(d.variables, "\n"))
+      -- debug("Add " .. d.tradfri_name .. " (" .. d.tradfri_id .. "), vars=" .. table.concat(d.variables, "\n"))
 
       luup.chdev.append(
         GWDeviceID,
@@ -343,6 +377,13 @@ function tradfriDevicesCallback(payload_str)
     end
 
     luup.chdev.sync(GWDeviceID, child_devices)
+
+    for k, d in pairs(Config.GW_Devices) do
+      local childId,_ = findChild(GWDeviceID, d.tradfri_id)
+      if (childId ~= nil) then
+          setLuupAttr("subcategory_num", d.subcategory or 0, childId)
+      end
+    end
   else
 
     for k, v in pairs(payload) do
@@ -365,10 +406,14 @@ function tradfriDevicesCallback(payload_str)
 end
 
 function tradfriGatewayCallback(payload_str)
-  debug("tradfriGatewayCallback " .. payload_str)
+  --debug("tradfriGatewayCallback " .. payload_str)
+  local payload, pos, err = json.decode(payload_str)
+  if err then
+    log(string.format("Parsing gateway data failed at %d: %s", pos, err))
+    return false
+  end
 
   setLuupVar("Connected", 1)
-  local payload = json.decode(payload_str)
 
   for k, v in pairs(payload) do
     if k == GW.ATTR_FIRMWARE_VERSION then
@@ -479,7 +524,9 @@ function init(lul_device)
   getDeviceVar("SecurityCode")  -- Make sure the variable is created
 
   if (not is_empty(Config.GW_Ip)) and (not is_empty(Config.GW_Port)) then
-    luup.call_delay("initTradfri", 10 + math.random(10), "")
+    local initDelay = 30 + math.random(10)
+    log(string.format("Connecting to Tradfri gateway in %d seconds ...", initDelay))
+    luup.call_delay("initTradfri", initDelay, "")
   else
     log("Unable to start the Tradfri plugin. Set the IP(address) attribute.")
   end
@@ -538,9 +585,9 @@ function SwitchPower_SetTarget(lul_device, newTargetValue)
   local tradfri_id = luup.devices[lul_device].id
   local tradfri_attr_group = Config.GW_Devices[tradfri_id].tradfri_attr_group
   if tradfri_id and tradfri_attr_group then
-    local v = (newTargetValue > 0) and "1" or "0"
-    luup.variable_set("urn:upnp-org:serviceId:SwitchPower1", "Target", v, lul_device)
-    luup.variable_set("urn:upnp-org:serviceId:SwitchPower1", "Status", v, lul_device)
+    local status = (newTargetValue > 0) and "1" or "0"
+    luup.variable_set("urn:upnp-org:serviceId:SwitchPower1", "Target", status, lul_device)
+    luup.variable_set("urn:upnp-org:serviceId:SwitchPower1", "Status", status, lul_device)
 
     local payload = {}
     local attrs = {}
@@ -553,7 +600,27 @@ end
 -- ServiceId: urn:upnp-org:serviceId:Dimming1
 -- Action: SetLoadLevelTarget
 function Dimming_SetLoadLevelTarget(lul_device, newLoadlevelTarget)
-  log(string.format("TODO Dimming_SetLoadLevelTarget: newLoadlevelTarget %d for device %d", newLoadlevelTarget, lul_device))
+  -- log(string.format("TODO Dimming_SetLoadLevelTarget: newLoadlevelTarget %d for device %d", newLoadlevelTarget, lul_device))
+  newLoadlevelTarget = tonumber(newLoadlevelTarget)
+
+  local tradfri_id = luup.devices[lul_device].id
+  local tradfri_attr_group = Config.GW_Devices[tradfri_id].tradfri_attr_group
+  if tradfri_id and tradfri_attr_group then
+    local dimming = math.floor(255*newLoadlevelTarget/100)
+    local status = (newLoadlevelTarget ~= 0)
+
+    luup.variable_set("urn:upnp-org:serviceId:Dimming1", "LoadLevelTarget", newLoadlevelTarget, lul_device)
+    luup.variable_set("urn:upnp-org:serviceId:Dimming1", "LoadLevelStatus", newLoadlevelTarget, lul_device)
+    luup.variable_set("urn:upnp-org:serviceId:SwitchPower1", "Target", status and "1" or "0", lul_device)
+    luup.variable_set("urn:upnp-org:serviceId:SwitchPower1", "Status", status and "1" or "0", lul_device)
+
+    local payload = {}
+    local attrs = {}
+    attrs[GW.ATTR_DEVICE_STATE] = status
+    attrs[GW.ATTR_LIGHT_DIMMER] = dimming
+    payload[tradfri_attr_group] = {attrs}
+    tradfriCommand(GW.METHOD_PUT, {GW.ROOT_DEVICES, tradfri_id}, payload)
+  end
 end
 
 -- ServiceId: urn:upnp-org:serviceId:HaDevice1
