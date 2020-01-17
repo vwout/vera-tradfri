@@ -264,12 +264,12 @@ end
 -- Main logic
 ------------------------------------------------------------------------------------
 
-function createOrUpdateRemote(payload, child_devices)
+local function createOrUpdateRemote(payload, child_devices)
   log("TODO: implement Remote device")
   return false
 end
 
-function createOrUpdateLight(payload, child_devices)
+local function createOrUpdateLight(payload, child_devices)
   local tradfri_id = tostring(payload[GW.ATTR_ID])
   local tradfri_name = payload[GW.ATTR_NAME] or ""
   local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
@@ -296,14 +296,15 @@ function createOrUpdateLight(payload, child_devices)
         "urn:upnp-org:serviceId:Dimming1,LoadLevelStatus=" .. tostring(device_dimming),
         "urn:upnp-org:serviceId:Dimming1,LoadLevelTarget=" .. tostring(device_dimming),
       },
-      subcategory = 1
+      subcategory = 1,
+      coap_observer = nil
     }
 
     Config.GW_Devices[tradfri_id] = data
   end
 end
 
-function createOrUpdateOutlet(payload, child_devices)
+local function createOrUpdateOutlet(payload, child_devices)
   local tradfri_id = tostring(payload[GW.ATTR_ID])
   local tradfri_name = payload[GW.ATTR_NAME] or ""
   local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
@@ -328,16 +329,143 @@ function createOrUpdateOutlet(payload, child_devices)
         "urn:upnp-org:serviceId:SwitchPower1,Status=" .. tostring(device_state),
         "urn:upnp-org:serviceId:SwitchPower1,Target=" .. tostring(device_state),
       },
-      subcategory = 1
+      subcategory = 1,
+      coap_observer = nil
     }
 
     Config.GW_Devices[tradfri_id] = data
   end
 end
 
-function createOrUpdateMotionSensor(payload, child_devices)
+local function createOrUpdateMotionSensor(payload, child_devices)
   log("TODO: implement Motion device")
   return false
+end
+
+local function setTradfriLightVars(payload, lul_device)
+  local device_attrs = payload[GW.ATTR_LIGHT_CONTROL] or {{}}
+  local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
+  local device_dimming = math.ceil(100 * (device_attrs[1][GW.ATTR_LIGHT_DIMMER] or 0) / 255)
+
+  setLuupVar("LoadLevelTarget", device_dimming, "urn:upnp-org:serviceId:Dimming1", lul_device)
+  setLuupVar("LoadLevelStatus", device_dimming, "urn:upnp-org:serviceId:Dimming1", lul_device)
+  setLuupVar("Target", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
+  setLuupVar("Status", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
+end
+
+local function setTradfriOutletVars(payload, lul_device)
+  local device_attrs = payload[GW.ATTR_SWITCH_PLUG] or {{}}
+  local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
+
+  setLuupVar("Target", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
+  setLuupVar("Status", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
+end
+
+
+local function tradfriCommand(method, path, payload, identity, psk)
+  identity = identity or Config.GW_Identity
+  psk = psk or Config.GW_Psk
+
+  local coapResult
+  local coapClient = coap.Client()
+  local path_str = table.concat(path, "/")
+  local url = string.format("coaps://%s:%s@%s:%d/%s", identity, psk, Config.GW_Ip, Config.GW_Port, path_str)
+
+  if method == GW.METHOD_OBSERVE then
+    local callback
+    if path[1] == GW.ROOT_DEVICES then
+      callback = tradfriDevicesObserveCallback
+    else
+      log(string.format("Unable to process observe command to %d, unknown callback.", path[1]))
+      return
+    end
+
+    debug("OBSERVE => " .. path_str)
+    coapResult = coapClient:observe(coap.CON, url, callback)
+    if type(coapResult) ~= 'userdata' then
+      log("CoAP call to gateway failed with error: " .. tostring(coapResult))
+      coapResult = nil
+    else
+      local coap_observer = {
+        client = coapClient,
+        listener = coapResult
+      }
+      coapResult = coap_observer
+    end
+  else
+    local callback
+    if path[1] == GW.ROOT_GATEWAY then
+      callback = tradfriGatewayCallback
+    elseif path[1] == GW.ROOT_DEVICES then
+      callback = tradfriDevicesCallback
+    else
+      log(string.format("Unable to process command to %d, unknown callback.", path[1]))
+      return
+    end
+
+    if method == GW.METHOD_GET then
+      debug("GET => " .. path_str)
+      coapResult = coapClient:get(coap.CON, url, callback)
+    elseif method == GW.METHOD_POST then
+      local payload_str = payload
+      if type(payload) == 'table' then
+        payload_str = json.encode(payload)
+      end
+
+      debug("POST " .. payload_str .. " => " .. path_str)
+      coapResult = coapClient:post(coap.CON, url, 0, payload_str, callback)
+    elseif method == GW.METHOD_PUT then
+      local payload_str = payload
+      if type(payload) == 'table' then
+        payload_str = json.encode(payload)
+      end
+
+      debug("PUT " .. payload_str .. " => " .. path_str)
+      coapResult = coapClient:put(coap.CON, url, 0, payload_str, callback)
+    else
+      log("Unable to process command, method '" .. method .. "' is unknown")
+    end
+
+    if coapResult ~= nil then
+      log(string.format("CoAP call to gateway failed with error: %d", coapResult))
+    end
+  end
+
+  return coapResult
+end
+
+function tradfriObserveDevice(tradfri_id)
+  if tradfri_id and Config.GW_Devices[tradfri_id] ~= nil then
+    local d = Config.GW_Devices[tradfri_id]
+
+    d.coap_observer = tradfriCommand(GW.METHOD_OBSERVE, {GW.ROOT_DEVICES, tradfri_id})
+    if (d.coap_observer ~= nil) and (d.coap_observer.listener ~= nil) then
+      d.coap_observer.listener:listen()
+    end
+  end
+end
+
+function tradfriDevicesObserveCallback(payload_str)
+  debug("tradfriDevicesObserveCallback " .. payload_str)
+  local payload, pos, err = json.decode(payload_str)
+  if err then
+    log(string.format("Parsing observed device data failed at %d: %s", pos, err))
+    return false
+  end
+
+  local tradfri_id = tostring(payload[GW.ATTR_ID])
+  if tradfri_id and Config.GW_Devices[tradfri_id] ~= nil then
+    local d = Config.GW_Devices[tradfri_id]
+    local childId,_ = findChild(GWDeviceID, d.tradfri_id)
+    if (childId ~= nil) then
+      local device_attrs = payload[d.tradfri_attr_group] or {{}}
+      if d.tradfri_appl_type == GW.APPLICATION_TYPE.LIGHT then
+        setTradfriLightVars(payload, childId)
+      elseif d.tradfri_appl_type == GW.APPLICATION_TYPE.OUTLET then
+        setTradfriOutletVars(payload, childId)
+      end
+    end
+  end
 end
 
 function tradfriDevicesCallback(payload_str)
@@ -378,14 +506,19 @@ function tradfriDevicesCallback(payload_str)
 
     luup.chdev.sync(GWDeviceID, child_devices)
 
+    local cnt = 1
     for k, d in pairs(Config.GW_Devices) do
       local childId,_ = findChild(GWDeviceID, d.tradfri_id)
       if (childId ~= nil) then
           setLuupAttr("subcategory_num", d.subcategory or 0, childId)
       end
+
+      local observeDelay = cnt * 5
+      debug(string.format("Start observing tradfri device %s in %d seconds", d.tradfri_id, observeDelay))
+      luup.call_delay("tradfriObserveDevice", observeDelay, d.tradfri_id)
+      cnt = cnt + 1
     end
   else
-
     for k, v in pairs(payload) do
       if k == GW.ATTR_APPLICATION_TYPE then
         if v == GW.APPLICATION_TYPE.REMOTE then
@@ -401,7 +534,6 @@ function tradfriDevicesCallback(payload_str)
         end
       end
     end
-
   end
 end
 
@@ -424,56 +556,6 @@ function tradfriGatewayCallback(payload_str)
     elseif k == GW.ATTR_COMMISSIONING_MODE then
       setLuupVar("Tradfri_Commissioning_Mode", v)
     end
-  end
-end
-
-function tradfriCommand(method, path, payload, identity, psk)
-  identity = identity or Config.GW_Identity
-  psk = psk or Config.GW_Psk
-
-  local coapResult
-  local coapClient = coap.Client()
-  local path_str = table.concat(path, "/")
-  local url = string.format("coaps://%s:%s@%s:%d/%s", identity, psk, Config.GW_Ip, Config.GW_Port, path_str)
-
-  local callback
-  if path[1] == GW.ROOT_GATEWAY then
-    callback = tradfriGatewayCallback
-  elseif path[1] == GW.ROOT_DEVICES then
-    callback = tradfriDevicesCallback
-  else
-    log(string.format("Unable to process command to %d, unknown callback.", path[1]))
-    return
-  end
-
-  if method == GW.METHOD_GET then
-    debug("GET => " .. path_str)
-    coapResult = coapClient:get(coap.CON, url, callback)
-  elseif method == GW.METHOD_POST then
-    local payload_str = payload
-    if type(payload) == 'table' then
-      payload_str = json.encode(payload)
-    end
-
-    debug("POST " .. payload_str .. " => " .. path_str)
-    coapResult = coapClient:post(coap.CON, url, 0, payload_str, callback)
-  elseif method == GW.METHOD_PUT then
-    local payload_str = payload
-    if type(payload) == 'table' then
-      payload_str = json.encode(payload)
-    end
-
-    debug("PUT " .. payload_str .. " => " .. path_str)
-    coapResult = coapClient:put(coap.CON, url, 0, payload_str, callback)
-  elseif method == GW.METHOD_OBSERVE then
-    --TODO
-    log("TODO: observe " .. path_str)
-  else
-    log("Unable to process command, method '" .. method .. "' is unknown")
-  end
-
-  if coapResult ~= nil then
-    log(string.format("CoAP call to gateway failed with error: %d", coapResult))
   end
 end
 
@@ -524,7 +606,7 @@ function init(lul_device)
   getDeviceVar("SecurityCode")  -- Make sure the variable is created
 
   if (not is_empty(Config.GW_Ip)) and (not is_empty(Config.GW_Port)) then
-    local initDelay = 30 + math.random(10)
+    local initDelay = 5 + math.random(10)
     log(string.format("Connecting to Tradfri gateway in %d seconds ...", initDelay))
     luup.call_delay("initTradfri", initDelay, "")
   else
@@ -585,15 +667,12 @@ function SwitchPower_SetTarget(lul_device, newTargetValue)
   local tradfri_id = luup.devices[lul_device].id
   local tradfri_attr_group = Config.GW_Devices[tradfri_id].tradfri_attr_group
   if tradfri_id and tradfri_attr_group then
-    local status = (newTargetValue > 0) and "1" or "0"
-    luup.variable_set("urn:upnp-org:serviceId:SwitchPower1", "Target", status, lul_device)
-    luup.variable_set("urn:upnp-org:serviceId:SwitchPower1", "Status", status, lul_device)
-
-    local payload = {}
     local attrs = {}
     attrs[GW.ATTR_DEVICE_STATE] = newTargetValue
+    local payload = {}
     payload[tradfri_attr_group] = {attrs}
     tradfriCommand(GW.METHOD_PUT, {GW.ROOT_DEVICES, tradfri_id}, payload)
+    setTradfriOutletVars(payload, lul_device)
   end
 end
 
@@ -606,20 +685,13 @@ function Dimming_SetLoadLevelTarget(lul_device, newLoadlevelTarget)
   local tradfri_id = luup.devices[lul_device].id
   local tradfri_attr_group = Config.GW_Devices[tradfri_id].tradfri_attr_group
   if tradfri_id and tradfri_attr_group then
-    local dimming = math.floor(255*newLoadlevelTarget/100)
-    local status = (newLoadlevelTarget ~= 0)
-
-    luup.variable_set("urn:upnp-org:serviceId:Dimming1", "LoadLevelTarget", newLoadlevelTarget, lul_device)
-    luup.variable_set("urn:upnp-org:serviceId:Dimming1", "LoadLevelStatus", newLoadlevelTarget, lul_device)
-    luup.variable_set("urn:upnp-org:serviceId:SwitchPower1", "Target", status and "1" or "0", lul_device)
-    luup.variable_set("urn:upnp-org:serviceId:SwitchPower1", "Status", status and "1" or "0", lul_device)
-
-    local payload = {}
     local attrs = {}
-    attrs[GW.ATTR_DEVICE_STATE] = status
-    attrs[GW.ATTR_LIGHT_DIMMER] = dimming
+    attrs[GW.ATTR_DEVICE_STATE] = (newLoadlevelTarget ~= 0)
+    attrs[GW.ATTR_LIGHT_DIMMER] = math.floor(255*newLoadlevelTarget/100)
+    local payload = {}
     payload[tradfri_attr_group] = {attrs}
     tradfriCommand(GW.METHOD_PUT, {GW.ROOT_DEVICES, tradfri_id}, payload)
+    setTradfriLightVars(payload, lul_device)
   end
 end
 
