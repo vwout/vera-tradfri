@@ -315,7 +315,6 @@ local function createOrUpdateOutlet(payload, child_devices)
   if tradfri_id and tradfri_name then
     local device_attrs = payload[GW.ATTR_SWITCH_PLUG] or {{}}
     local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
-    --local power_factor = device_attrs[GW.ATTR_SWITCH_POWER_FACTOR] or 0
 
     local data = {
       tradfri_id = tradfri_id,
@@ -361,6 +360,15 @@ local function setTradfriOutletVars(payload, lul_device)
   setLuupVar("Status", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
 end
 
+local function protect_callback(callback)
+  return function(payload)
+      local ok, err = pcall(callback, payload)
+      if not ok then
+        log("Callback failed: " .. err)
+      end
+    end
+end
+
 
 local function tradfriCommand(method, path, payload, identity, psk)
   identity = identity or Config.GW_Identity
@@ -374,30 +382,33 @@ local function tradfriCommand(method, path, payload, identity, psk)
   if method == GW.METHOD_OBSERVE then
     local callback
     if path[1] == GW.ROOT_DEVICES then
-      callback = tradfriDevicesObserveCallback
+      callback = protect_callback(tradfriDevicesObserveCallback)
     else
       log(string.format("Unable to process observe command to %d, unknown callback.", path[1]))
       return
     end
 
     debug("OBSERVE => " .. path_str)
-    coapResult = coapClient:observe(coap.CON, url, callback)
-    if type(coapResult) ~= 'userdata' then
-      log("CoAP call to gateway failed with error: " .. tostring(coapResult))
-      coapResult = nil
+    local ok, coapResult_or_err = pcall(function() return coapClient:observe(coap.CON, url, callback) end)
+    if ok then
+      if type(coapResult_or_err) ~= 'userdata' then
+        log("CoAP call to gateway failed with error: " .. tostring(coapResult_or_err))
+      else
+        local coap_observer = {
+          client = coapClient,
+          listener = coapResult_or_err
+        }
+        coapResult = coap_observer
+      end
     else
-      local coap_observer = {
-        client = coapClient,
-        listener = coapResult
-      }
-      coapResult = coap_observer
+      log(string.format("CoAP observe call to %s failed: %s", path_str, coapResult_or_err))
     end
   else
     local callback
     if path[1] == GW.ROOT_GATEWAY then
-      callback = tradfriGatewayCallback
+      callback = protect_callback(tradfriGatewayCallback)
     elseif path[1] == GW.ROOT_DEVICES then
-      callback = tradfriDevicesCallback
+      callback = protect_callback(tradfriDevicesCallback)
     else
       log(string.format("Unable to process command to %d, unknown callback.", path[1]))
       return
@@ -405,7 +416,12 @@ local function tradfriCommand(method, path, payload, identity, psk)
 
     if method == GW.METHOD_GET then
       debug("GET => " .. path_str)
-      coapResult = coapClient:get(coap.CON, url, callback)
+      local ok, coapResult_or_err = pcall(function() return coapClient:get(coap.CON, url, callback) end)
+      if ok then
+        coapResult = coapResult_or_err
+      else
+        log(string.format("CoAP get call to %s failed: %s", path_str, coapResult_or_err))
+      end
     elseif method == GW.METHOD_POST then
       local payload_str = payload
       if type(payload) == 'table' then
@@ -413,7 +429,12 @@ local function tradfriCommand(method, path, payload, identity, psk)
       end
 
       debug("POST " .. payload_str .. " => " .. path_str)
-      coapResult = coapClient:post(coap.CON, url, 0, payload_str, callback)
+      local ok, coapResult_or_err = pcall(function() return coapClient:post(coap.CON, url, 0, payload_str, callback) end)
+      if ok then
+        coapResult = coapResult_or_err
+      else
+        log(string.format("CoAP post call to %s failed: %s", path_str, coapResult_or_err))
+      end
     elseif method == GW.METHOD_PUT then
       local payload_str = payload
       if type(payload) == 'table' then
@@ -421,7 +442,12 @@ local function tradfriCommand(method, path, payload, identity, psk)
       end
 
       debug("PUT " .. payload_str .. " => " .. path_str)
-      coapResult = coapClient:put(coap.CON, url, 0, payload_str, callback)
+      local ok, coapResult_or_err = pcall(function() return coapClient:put(coap.CON, url, 0, payload_str, callback) end)
+      if ok then
+        coapResult = coapResult_or_err
+      else
+        log(string.format("CoAP post call to %s failed: %s", path_str, coapResult_or_err))
+      end
     else
       log("Unable to process command, method '" .. method .. "' is unknown")
     end
@@ -440,7 +466,10 @@ function tradfriObserveDevice(tradfri_id)
 
     d.coap_observer = tradfriCommand(GW.METHOD_OBSERVE, {GW.ROOT_DEVICES, tradfri_id})
     if (d.coap_observer ~= nil) and (d.coap_observer.listener ~= nil) then
-      d.coap_observer.listener:listen()
+      local ok, err = pcall(function() d.coap_observer.listener:listen() end)
+      if not ok then
+        log(string.format("CoAP observer listen call failed for device %s: %s", tradfri_id, err))
+      end
     end
   end
 end
