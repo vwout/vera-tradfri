@@ -50,7 +50,19 @@ GW.ATTR_DEVICE_INFO = "3"
 GW.DEVICE_INFO = {}
 GW.DEVICE_INFO.BRAND = "0"
 GW.DEVICE_INFO.NAME = "1"
+GW.DEVICE_INFO.SERIAL = "2"
 GW.DEVICE_INFO.FIRMWARE_VERSION = "3"
+GW.DEVICE_INFO.POWER_SOURCES = "6"
+GW.DEVICE_INFO.POWER_SOURCE = {}
+GW.DEVICE_INFO.POWER_SOURCE.UNKNOWN = 0
+GW.DEVICE_INFO.POWER_SOURCE.INTERNAL_BATTERY = 1
+GW.DEVICE_INFO.POWER_SOURCE.EXTERNAL_BATTERY = 2
+GW.DEVICE_INFO.POWER_SOURCE.BATTERY = 3
+GW.DEVICE_INFO.POWER_SOURCE.POE = 4  -- Power over Ethernet
+GW.DEVICE_INFO.POWER_SOURCE.USB = 5
+GW.DEVICE_INFO.POWER_SOURCE.MAINS = 6
+GW.DEVICE_INFO.POWER_SOURCE.SOLAR = 7
+GW.DEVICE_INFO.BATTERY_LEVEL = "9"
 
 GW.ATTR_GATEWAY_ID_2 = "9100"  -- stored in IKEA app code as gateway id
 GW.ATTR_GATEWAY_TIME_SOURCE = "9071"
@@ -88,6 +100,28 @@ GW.ATTR_GOOGLE_HOME_PAIR_STATUS = "9105"
 GW.ATTR_DEVICE_STATE = "5850"
 GW.ATTR_LIGHT_DIMMER = "5851"  -- Dimmer, not following spec: 0..255
 GW.ATTR_LIGHT_COLOR_HEX = "5706"  -- string representing a value in hex
+GW.LIGHT_COLORS = {
+    ["4a418a"] = "Blue",
+    ["6c83ba"] = "Light Blue",
+    ["8f2686"] = "Saturated Purple",
+    ["a9d62b"] = "Lime",
+    ["c984bb"] = "Light Purple",
+    ["d6e44b"] = "Yellow",
+    ["d9337c"] = "Saturated Pink",
+    ["da5d41"] = "Dark Peach",
+    ["dc4b31"] = "Saturated Red",
+    ["dcf0f8"] = "Cold sky",
+    ["e491af"] = "Pink",
+    ["e57345"] = "Peach",
+    ["e78834"] = "Warm Amber",
+    ["e8bedd"] = "Light Pink",
+    ["eaf6fb"] = "Cool daylight",
+    ["ebb63e"] = "Candlelight",
+    ["efd275"] = "Warm glow",
+    ["f1e0b5"] = "Warm white",
+    ["f2eccf"] = "Sunrise",
+    ["f5faf6"] = "Cool white",
+}
 GW.ATTR_LIGHT_COLOR_X = "5709"
 GW.ATTR_LIGHT_COLOR_Y = "5710"
 GW.ATTR_LIGHT_COLOR_HUE = "5707"
@@ -341,6 +375,28 @@ local function createOrUpdateMotionSensor(payload, child_devices)
   return false
 end
 
+local function setTradfriDeviceVars(payload, lul_device)
+  local last_seen_time = payload[GW.ATTR_LAST_SEEN]
+  if last_seen_time then
+    setLuupVar("LastTimeCheck", last_seen_time, "urn:upnp-org:serviceId:HaDevice1", lul_device)
+  end
+
+  local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
+  local firmware = tradfri_device_info[GW.DEVICE_INFO.FIRMWARE_VERSION]
+  if firmware then
+    setLuupVar("Tradfri_Firmware_Version", firmware, "urn:upnp-org:serviceId:HaDevice1", lul_device)
+  end
+
+  local power_source = tradfri_device_info[GW.DEVICE_INFO.POWER_SOURCES]
+  -- GW.DEVICE_INFO.POWER_SOURCE.INTERNAL_BATTERY and GW.DEVICE_INFO.POWER_SOURCE.EXTERNAL_BATTERY are used for mains-connected outlet
+  if power_source == GW.DEVICE_INFO.POWER_SOURCE.BATTERY then
+    setLuupVar("BatteryLevel", tradfri_device_info[GW.DEVICE_INFO.BATTERY_LEVEL], "urn:upnp-org:serviceId:HaDevice1", lul_device)
+    if last_seen_time then
+      setLuupVar("BatteryDate", last_seen_time, "urn:upnp-org:serviceId:HaDevice1", lul_device)
+    end
+  end
+end
+
 local function setTradfriLightVars(payload, lul_device)
   local device_attrs = payload[GW.ATTR_LIGHT_CONTROL] or {{}}
   local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
@@ -350,6 +406,20 @@ local function setTradfriLightVars(payload, lul_device)
   setLuupVar("LoadLevelStatus", device_dimming, "urn:upnp-org:serviceId:Dimming1", lul_device)
   setLuupVar("Target", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
   setLuupVar("Status", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
+
+  local color_hex = device_attrs[1][GW.ATTR_LIGHT_COLOR_HEX]
+  if color_hex ~= nil then
+    setLuupVar("CurrentColor", "#" .. tostring(color_hex), "urn:micasaverde-com:serviceId:Color1", lul_device)
+    setLuupVar("TargetColor", "#" .. tostring(color_hex), "urn:micasaverde-com:serviceId:Color1", lul_device)
+
+    local supported_colors = {}
+    for hex,_ in pairs(GW.LIGHT_COLORS) do
+      supported_colors[#supported_colors + 1] = "#" .. hex
+    end
+    setLuupVar("SupportedColors", table.concat(supported_colors, ","), "urn:micasaverde-com:serviceId:Color1", lul_device)
+  end
+
+  setTradfriDeviceVars(payload, lul_device)
 end
 
 local function setTradfriOutletVars(payload, lul_device)
@@ -358,6 +428,8 @@ local function setTradfriOutletVars(payload, lul_device)
 
   setLuupVar("Target", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
   setLuupVar("Status", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
+
+  setTradfriDeviceVars(payload, lul_device)
 end
 
 local function protect_callback(callback)
@@ -578,7 +650,7 @@ function tradfriGatewayCallback(payload_str)
 
   for k, v in pairs(payload) do
     if k == GW.ATTR_FIRMWARE_VERSION then
-      setLuupVar("Tradfri_Firmare_Version", v)
+      setLuupVar("Tradfri_Firmware_Version", v)
     elseif k == GW.ATTR_PSK then
       Config.GW_Psk = v
       setLuupVar("Psk", v)
