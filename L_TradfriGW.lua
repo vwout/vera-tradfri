@@ -684,6 +684,9 @@ function initTradfri()
 
       luup.call_delay("initTradfri", initDelay, "")  -- Try again or continue initialization
   else
+    -- Clear SecurityCode when an Identity/Psk is available
+    setLuupVar("SecurityCode", "")
+
     -- Load gateway information
     tradfriCommand(GW.METHOD_GET, {GW.ROOT_GATEWAY, GW.ATTR_GATEWAY_INFO})
     -- TODO: Load devices
