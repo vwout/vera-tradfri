@@ -127,6 +127,7 @@ GW.ATTR_LIGHT_COLOR_Y = "5710"
 GW.ATTR_LIGHT_COLOR_HUE = "5707"
 GW.ATTR_LIGHT_COLOR_SATURATION = "5708"
 GW.ATTR_LIGHT_MIREDS = "5711"
+GW.ATTR_LIGHT_MIRED_RANGE = {250, 454}  -- 2200 - 4000  Kelvin
 
 GW.ATTR_NOTIFICATION_EVENT = "9015"
 GW.ATTR_NOTIFICATION_NVPAIR = "9017"
@@ -315,6 +316,16 @@ local function createOrUpdateLight(payload, child_devices)
     local device_attrs = payload[GW.ATTR_LIGHT_CONTROL] or {{}}
     local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
     local device_dimming = math.ceil(100 * (device_attrs[1][GW.ATTR_LIGHT_DIMMER] or 0) / 255)
+    local mireds = device_attrs[1][GW.ATTR_LIGHT_MIREDS]
+    local color_hex = device_attrs[1][GW.ATTR_LIGHT_COLOR_HEX]
+
+    local variables = {
+        "urn:upnp-org:serviceId:SwitchPower1,Status=" .. tostring(device_state),
+        "urn:upnp-org:serviceId:SwitchPower1,Target=" .. tostring(device_state),
+        "urn:upnp-org:serviceId:Dimming1,LoadLevelStatus=" .. tostring(device_dimming),
+        "urn:upnp-org:serviceId:Dimming1,LoadLevelTarget=" .. tostring(device_dimming),
+        "urn:micasaverde-com:serviceId:Color1,SupportedColors" .. (color_hex and "W,D,R,G,B" or mireds and "W" or "")
+    }
 
     local data = {
       tradfri_id = tradfri_id,
@@ -322,14 +333,9 @@ local function createOrUpdateLight(payload, child_devices)
       tradfri_attr_group = GW.ATTR_LIGHT_CONTROL,
       tradfri_name = tradfri_name,
       sid = GWDimmingSID,
-      device_type = "urn:schemas-upnp-org:device:DimmableLight:1",
-      d_xml = "D_DimmableLight1.xml",
-      variables = {
-        "urn:upnp-org:serviceId:SwitchPower1,Status=" .. tostring(device_state),
-        "urn:upnp-org:serviceId:SwitchPower1,Target=" .. tostring(device_state),
-        "urn:upnp-org:serviceId:Dimming1,LoadLevelStatus=" .. tostring(device_dimming),
-        "urn:upnp-org:serviceId:Dimming1,LoadLevelTarget=" .. tostring(device_dimming),
-      },
+      device_type = (color_hex or mireds) and "urn:schemas-upnp-org:device:DimmableRGBLight:1" or "urn:schemas-upnp-org:device:DimmableLight:1",
+      d_xml = (color_hex or mireds) and "D_DimmableRGBLight1.xml" or "D_DimmableLight1.xml",
+      variables = variables,
       subcategory = 1,
       coap_observer = nil
     }
@@ -407,16 +413,35 @@ local function setTradfriLightVars(payload, lul_device)
   setLuupVar("Target", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
   setLuupVar("Status", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
 
+  local mireds = device_attrs[1][GW.ATTR_LIGHT_MIREDS]
   local color_hex = device_attrs[1][GW.ATTR_LIGHT_COLOR_HEX]
-  if color_hex ~= nil then
-    setLuupVar("CurrentColor", "#" .. tostring(color_hex), "urn:micasaverde-com:serviceId:Color1", lul_device)
-    setLuupVar("TargetColor", "#" .. tostring(color_hex), "urn:micasaverde-com:serviceId:Color1", lul_device)
 
-    local supported_colors = {}
-    for hex,_ in pairs(GW.LIGHT_COLORS) do
-      supported_colors[#supported_colors + 1] = "#" .. hex
+  if mireds ~= nil then
+    local w, d = 0, 0
+    -- Source: https://nl.wikipedia.org/wiki/Mired
+    -- Convert Mired to Kelvin
+    local kelvin = math.floor(1000000/mireds)
+    if kelvin < 5450 then
+      w = (math.floor((kelvin-2000) / (3500/255)) + 1) or 0
+    else
+      d = (math.floor((kelvin-5500) / (3500/255)) + 1) or 0
     end
-    setLuupVar("SupportedColors", table.concat(supported_colors, ","), "urn:micasaverde-com:serviceId:Color1", lul_device)
+
+    setLuupVar("CurrentColor", string.format("0=%d,1=%d", w, d), "urn:micasaverde-com:serviceId:Color1", lul_device)
+    setLuupVar("TargetColor", string.format("0=%d,1=%d", w, d), "urn:micasaverde-com:serviceId:Color1", lul_device)
+  elseif color_hex ~= nil then
+    local w, d, r, g, b = 0, 0, 255, 255, 255
+    r = tonumber(string.sub("f1e0b5", -6, -5), 16)  or 0
+    g = tonumber(string.sub("f1e0b5", -4, -3), 16) or 0
+    b = tonumber(string.sub("f1e0b5", -2), 16) or 0
+    setLuupVar("CurrentColor", string.format("0=%d,1=%d,2=%d,3=%d,4=%d", w, d, r, g, b), "urn:micasaverde-com:serviceId:Color1", lul_device)
+    setLuupVar("TargetColor", string.format("0=%d,1=%d,2=%d,3=%d,4=%d", w, d, r, g, b), "urn:micasaverde-com:serviceId:Color1", lul_device)
+
+    -- local supported_colors = {}
+    -- for hex,_ in pairs(GW.LIGHT_COLORS) do
+    --   supported_colors[#supported_colors + 1] = "#" .. hex
+    -- end
+    -- setLuupVar("SupportedColors", table.concat(supported_colors, ","), "urn:micasaverde-com:serviceId:Color1", lul_device)
   end
 
   setTradfriDeviceVars(payload, lul_device)
@@ -813,8 +838,38 @@ end
 
 -- ServiceId: urn:upnp-org:serviceId:Color1
 -- Action: SetColor
+-- Sets color temperature
+-- Warm White: Wx
+-- Cool White: Dx
+-- W0     <--> W255  =  D0     <--> D255
+-- 2000K <--> 5500K = 5500K <--> 9000K
+-- mired range: 250 - 454  -- 2200 - 4000  Kelvin
 function Color_SetColor(lul_device, newColorTarget)
-  log(string.format("TODO Color_SetColor: newColorTarget %s for device %d", newColorTarget, lul_device))
+  local colortemp_mode = string.sub(newColorTarget, 1, 1)
+	local value = tonumber(string.sub(newColorTarget, 2))
+	local kelvin = 0
+  if colortemp_mode == "W" then
+    kelvin = 2000 + math.floor((value * 3500/255))
+  elseif colortemp_mode == "D" then
+    kelvin = 5500 + math.floor((value * 3500/255))
+  end
+
+  if kelvin > 0 then
+	  local mireds = math.floor(1000000/kelvin)
+    mireds = math.max(mireds, GW.ATTR_LIGHT_MIRED_RANGE[1])
+    mireds = math.min(mireds, GW.ATTR_LIGHT_MIRED_RANGE[2])
+
+    local tradfri_id = luup.devices[lul_device].id
+    local tradfri_attr_group = Config.GW_Devices[tradfri_id].tradfri_attr_group
+    if tradfri_id and tradfri_attr_group then
+      local attrs = {}
+      attrs[GW.ATTR_LIGHT_MIREDS] = mireds
+      local payload = {}
+      payload[tradfri_attr_group] = {attrs}
+      tradfriCommand(GW.METHOD_PUT, {GW.ROOT_DEVICES, tradfri_id}, payload)
+      setTradfriLightVars(payload, lul_device)
+    end
+  end
 end
 
 -- ServiceId: urn:upnp-org:serviceId:SecuritySensor1
