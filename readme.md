@@ -9,6 +9,8 @@ Due to technical limitations of the Tradfri system, it is not possible to captur
 These directly control linked devices, so only the effect of an action on a remote can be observed when a light or outlet state changes. 
 
 ## Installation
+- Copy or upload `D_TradfriGW.json`, `D_TradfriGW.xml`, `I_TradfriGW.xml` and `L_TradfriGW.lua`.
+- Get `D_DimmableLight1.xml`, `D_DimmableRGBLight1.xml` and `D_BinaryLight1.xml` files plus the `.json` variants from your Vera and copy or upload these when you use `openLuup`.
 - Add a new device by clicking *Create* on the *Devices* page. Use `D_TradfriGW.xml` as the *definition* filename and `I_TradfriGW.xml` as the *implementation* filename.
 - Wait for the new device to appear.
 - Configure the IP of your Tradfri Gateway in the `ip` attribute.
