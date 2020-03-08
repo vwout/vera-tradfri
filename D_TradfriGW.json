@@ -219,7 +219,8 @@
             "Action": "SetCommissioningMode",
             "Parameters": [
               {
-                "commissioning_timeout": 60
+                "Name": "CommissioningTimeout",
+                "Value": "120",
               }
             ]
           }

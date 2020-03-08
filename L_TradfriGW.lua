@@ -431,7 +431,7 @@ local function setTradfriLightVars(payload, lul_device)
     setLuupVar("TargetColor", string.format("0=%d,1=%d", w, d), "urn:micasaverde-com:serviceId:Color1", lul_device)
   elseif color_hex ~= nil then
     local w, d, r, g, b = 0, 0, 255, 255, 255
-    r = tonumber(string.sub("f1e0b5", -6, -5), 16)  or 0
+    r = tonumber(string.sub("f1e0b5", -6, -5), 16) or 0
     g = tonumber(string.sub("f1e0b5", -4, -3), 16) or 0
     b = tonumber(string.sub("f1e0b5", -2), 16) or 0
     setLuupVar("CurrentColor", string.format("0=%d,1=%d,2=%d,3=%d,4=%d", w, d, r, g, b), "urn:micasaverde-com:serviceId:Color1", lul_device)
@@ -766,10 +766,10 @@ end
 
 -- ServiceId: urn:upnp-org:serviceId:tradfri-gw1
 -- Action: SetCommissioningMode
-function SetCommissioningMode(lul_device, timeout)
+function SetCommissioningMode(lul_device, CommissioningTimeout)
   if GWDeviceID == lul_device then
     local payload = {}
-    payload[GW.ATTR_COMMISSIONING_MODE] = timeout
+    payload[GW.ATTR_COMMISSIONING_MODE] = tonumber(CommissioningTimeout) or 60
     tradfriCommand(GW.METHOD_PUT, {GW.ROOT_GATEWAY, GW.ATTR_GATEWAY_INFO}, payload)
   end
 end
