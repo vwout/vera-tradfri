@@ -22,13 +22,14 @@ GW.ROOT_SIGNAL_REPEATER = "15014"
 GW.ROOT_SMART_TASKS = "15010"
 GW.ROOT_START_ACTION = "15013"  -- found under ATTR_START_ACTION
 
-GW.ATTR_START_BLINDS = "15015"
+GW.ATTR_BLINDS_CONTROL = "15015"
 
 GW.ATTR_ALEXA_PAIR_STATUS = "9093"
 GW.ATTR_AUTH = "9063"
 GW.ATTR_APPLICATION_TYPE = "5750"
 GW.APPLICATION_TYPE = {}
-GW.APPLICATION_TYPE.REMOTE = 1
+GW.APPLICATION_TYPE.REMOTE = 0
+-- GW.APPLICATION_TYPE.REMOTE = 1  -- type for remotes is 0 on recent firmwares
 GW.APPLICATION_TYPE.LIGHT = 2
 GW.APPLICATION_TYPE.OUTLET = 3
 GW.APPLICATION_TYPE.MOTION = 4
@@ -185,6 +186,7 @@ local GWSwitchPowerSID    = "urn:upnp-org:serviceId:SwitchPower1"
 local GWDimmingSID        = "urn:upnp-org:serviceId:Dimming1"
 local GWColorSID          = "urn:micasaverde-com:serviceId:Color1"
 local GWSecuritySensorSID = "urn:micasaverde-com:serviceId:SecuritySensor1"
+local GWBlindSID          = "urn:upnp-org:serviceId:WindowCovering1"
 
 local GWDeviceType        = "urn:schemas-upnp-org:device:tradfri-gw:1"
 
@@ -381,6 +383,39 @@ local function createOrUpdateMotionSensor(payload, child_devices)
   return false
 end
 
+local function createOrUpdateBlind(payload, child_devices)
+  local tradfri_id = tostring(payload[GW.ATTR_ID])
+  local tradfri_name = payload[GW.ATTR_NAME] or ""
+  local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
+  if tradfri_name == "" then
+    tradfri_name = tradfri_device_info[GW.DEVICE_INFO.NAME] or "Tradfri Blind"
+  end
+
+  if tradfri_id and tradfri_name then
+    local device_attrs = payload[GW.ATTR_BLINDS_CONTROL] or {{}}
+    local position = tonumber(device_attrs[1][GW.ATTR_BLIND_CURRENT_POSITION]) or 0
+    position = math.min(math.max(position, 0), 100)
+
+    local data = {
+      tradfri_id = tradfri_id,
+      tradfri_appl_type = GW.APPLICATION_TYPE.BLIND,
+      tradfri_attr_group = GW.ATTR_BLINDS_CONTROL,
+      tradfri_name = tradfri_name,
+      sid = GWBlindSID,
+      device_type = "urn:schemas-micasaverde-com:device:WindowCovering:1",
+      d_xml = "D_WindowCovering1.xml",
+      variables = {
+        "urn:upnp-org:serviceId:Dimming1,LoadLevelStatus=" .. tostring(position),
+        "urn:upnp-org:serviceId:Dimming1,LoadLevelTarget=" .. tostring(position),
+      },
+      subcategory = 1,
+      coap_observer = nil
+    }
+
+    Config.GW_Devices[tradfri_id] = data
+  end
+end
+
 local function setTradfriDeviceVars(payload, lul_device)
   local last_seen_time = payload[GW.ATTR_LAST_SEEN]
   if last_seen_time then
@@ -453,6 +488,17 @@ local function setTradfriOutletVars(payload, lul_device)
 
   setLuupVar("Target", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
   setLuupVar("Status", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
+
+  setTradfriDeviceVars(payload, lul_device)
+end
+
+local function setTradfriBlindVars(payload, lul_device)
+  local device_attrs = payload[GW.ATTR_BLINDS_CONTROL] or {{}}
+  local position = tonumber(device_attrs[1][GW.ATTR_BLIND_CURRENT_POSITION]) or 0
+  position = math.min(math.max(position, 0), 100)
+
+  setLuupVar("LoadLevelTarget", position, "urn:upnp-org:serviceId:Dimming1", lul_device)
+  setLuupVar("LoadLevelStatus", position, "urn:upnp-org:serviceId:Dimming1", lul_device)
 
   setTradfriDeviceVars(payload, lul_device)
 end
@@ -589,6 +635,8 @@ function tradfriDevicesObserveCallback(payload_str)
         setTradfriLightVars(payload, childId)
       elseif d.tradfri_appl_type == GW.APPLICATION_TYPE.OUTLET then
         setTradfriOutletVars(payload, childId)
+      elseif d.tradfri_appl_type == GW.APPLICATION_TYPE.BLIND then
+        setTradfriBlindVars(payload, childId)
       end
     end
   end
@@ -655,6 +703,8 @@ function tradfriDevicesCallback(payload_str)
           createOrUpdateOutlet(payload, child_devices)
         elseif v == GW.APPLICATION_TYPE.MOTION then
           createOrUpdateMotionSensor(payload, child_devices)
+        elseif v == GW.APPLICATION_TYPE.BLIND then
+          createOrUpdateBlind(payload, child_devices)
         else
           log(string.format("Unknown device type received (%d): %s", v, payload_str))
         end
@@ -808,19 +858,30 @@ end
 -- ServiceId: urn:upnp-org:serviceId:Dimming1
 -- Action: SetLoadLevelTarget
 function Dimming_SetLoadLevelTarget(lul_device, newLoadlevelTarget)
-  -- log(string.format("TODO Dimming_SetLoadLevelTarget: newLoadlevelTarget %d for device %d", newLoadlevelTarget, lul_device))
-  newLoadlevelTarget = tonumber(newLoadlevelTarget)
+  newLoadlevelTarget = tonumber(newLoadlevelTarget) or 0
+  newLoadlevelTarget = math.min(math.max(newLoadlevelTarget, 0), 100)
 
   local tradfri_id = luup.devices[lul_device].id
   local tradfri_attr_group = Config.GW_Devices[tradfri_id].tradfri_attr_group
-  if tradfri_id and tradfri_attr_group then
-    local attrs = {}
-    attrs[GW.ATTR_DEVICE_STATE] = (newLoadlevelTarget ~= 0)
-    attrs[GW.ATTR_LIGHT_DIMMER] = math.floor(255*newLoadlevelTarget/100)
-    local payload = {}
-    payload[tradfri_attr_group] = {attrs}
-    tradfriCommand(GW.METHOD_PUT, {GW.ROOT_DEVICES, tradfri_id}, payload)
-    setTradfriLightVars(payload, lul_device)
+  if tradfri_id then
+    if tradfri_attr_group == GW.ATTR_LIGHT_CONTROL then
+      local attrs = {}
+      attrs[GW.ATTR_DEVICE_STATE] = (newLoadlevelTarget ~= 0)
+      attrs[GW.ATTR_LIGHT_DIMMER] = math.floor(255*newLoadlevelTarget/100)
+      local payload = {}
+      payload[tradfri_attr_group] = {attrs}
+      tradfriCommand(GW.METHOD_PUT, {GW.ROOT_DEVICES, tradfri_id}, payload)
+      setTradfriLightVars(payload, lul_device)
+    elseif tradfri_attr_group == GW.ATTR_BLINDS_CONTROL then
+      local attrs = {}
+      attrs[GW.ATTR_BLIND_CURRENT_POSITION] = newLoadlevelTarget
+      local payload = {}
+      payload[tradfri_attr_group] = {attrs}
+      tradfriCommand(GW.METHOD_PUT, {GW.ROOT_DEVICES, tradfri_id}, payload)
+      setTradfriBlindVars(payload, lul_device)
+    else
+      log(string.format("SetLoadLevelTarget not supported for attribute %s for tradfri device %s", tradfri_attr_group, tradfri_id))
+    end
   end
 end
 
