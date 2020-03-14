@@ -639,7 +639,7 @@ function tradfriDevicesCallback(payload_str)
           setLuupAttr("subcategory_num", d.subcategory or 0, childId)
       end
 
-      local observeDelay = cnt * 5
+      local observeDelay = cnt
       debug(string.format("Start observing tradfri device %s in %d seconds", d.tradfri_id, observeDelay))
       luup.call_delay("tradfriObserveDevice", observeDelay, d.tradfri_id)
       cnt = cnt + 1
