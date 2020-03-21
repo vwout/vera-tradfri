@@ -99,7 +99,7 @@ GW.ATTR_GATEWAY_FACTORY_DEFAULTS_MIN_MAX_MSR = "5605"
 GW.ATTR_GOOGLE_HOME_PAIR_STATUS = "9105"
 
 GW.ATTR_DEVICE_STATE = "5850"
-GW.ATTR_LIGHT_DIMMER = "5851"  -- Dimmer, not following spec: 0..255
+GW.ATTR_LIGHT_DIMMER = "5851"  -- Dimmer, not following spec: 0..254
 GW.ATTR_LIGHT_COLOR_HEX = "5706"  -- string representing a value in hex
 GW.LIGHT_COLORS = {
     ["4a418a"] = "Blue",
@@ -317,7 +317,7 @@ local function createOrUpdateLight(payload, child_devices)
   if tradfri_id and tradfri_name then
     local device_attrs = payload[GW.ATTR_LIGHT_CONTROL] or {{}}
     local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
-    local device_dimming = math.ceil(100 * (device_attrs[1][GW.ATTR_LIGHT_DIMMER] or 0) / 255)
+    local device_dimming = math.ceil(100 * (device_attrs[1][GW.ATTR_LIGHT_DIMMER] or 0) / 254)
     local mireds = device_attrs[1][GW.ATTR_LIGHT_MIREDS]
     local color_hex = device_attrs[1][GW.ATTR_LIGHT_COLOR_HEX]
 
@@ -441,7 +441,7 @@ end
 local function setTradfriLightVars(payload, lul_device)
   local device_attrs = payload[GW.ATTR_LIGHT_CONTROL] or {{}}
   local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
-  local device_dimming = math.ceil(100 * (device_attrs[1][GW.ATTR_LIGHT_DIMMER] or 0) / 255)
+  local device_dimming = math.ceil(100 * (device_attrs[1][GW.ATTR_LIGHT_DIMMER] or 0) / 254)
 
   setLuupVar("LoadLevelTarget", device_dimming, "urn:upnp-org:serviceId:Dimming1", lul_device)
   setLuupVar("LoadLevelStatus", device_dimming, "urn:upnp-org:serviceId:Dimming1", lul_device)
@@ -867,8 +867,8 @@ function Dimming_SetLoadLevelTarget(lul_device, newLoadlevelTarget)
   if tradfri_id then
     if tradfri_attr_group == GW.ATTR_LIGHT_CONTROL then
       local attrs = {}
-      attrs[GW.ATTR_DEVICE_STATE] = (newLoadlevelTarget ~= 0)
-      attrs[GW.ATTR_LIGHT_DIMMER] = math.floor(255*newLoadlevelTarget/100)
+      attrs[GW.ATTR_DEVICE_STATE] = (newLoadlevelTarget ~= 0) and 1 or 0
+      attrs[GW.ATTR_LIGHT_DIMMER] = math.floor(254*newLoadlevelTarget/100)
       local payload = {}
       payload[tradfri_attr_group] = {attrs}
       tradfriCommand(GW.METHOD_PUT, {GW.ROOT_DEVICES, tradfri_id}, payload)
