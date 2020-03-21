@@ -209,12 +209,12 @@ local Config = {
 ------------------------------------------------------------------------------------
 
 local function log(message)
-  luup.log("TradfriGW #" .. GWDeviceID .. ": " .. (message or ""))
+  luup.log("TradfriGW #" .. (GWDeviceID or "?") .. ": " .. (message or ""))
 end
 
 local function debug(message)
   if Config.GW_DebugMode then
-    luup.log("TradfriGW #" .. GWDeviceID .. " DEBUG: " .. (message or ""))
+    luup.log("TradfriGW #" .. (GWDeviceID or "?") .. " DEBUG: " .. (message or ""))
   end
 end
 
@@ -507,7 +507,7 @@ local function protect_callback(callback)
   return function(payload)
       local ok, err = pcall(callback, payload)
       if not ok then
-        log("Callback failed: " .. err)
+        log("Callback failed: " .. (err or "<Unknown>"))
       end
     end
 end
@@ -780,8 +780,8 @@ function init(lul_device)
   Config.GW_Ip                 = luup.devices[GWDeviceID].ip
   Config.GW_Port               = tonumber(getDeviceVar("Port", Config.GW_Port, 1025, 65535))
   Config.GW_Identity           = getLuupVar("Identity")
-  Config.GW_Psk                = getLuupVar("Psk")
-  Config.GW_DebugMode          = getDeviceVar("Debug", 0)
+  Config.GW_Psk                = getDeviceVar("Psk", "")
+  Config.GW_DebugMode          = getDeviceVar("Debug", 0) == "1"
   getDeviceVar("SecurityCode")  -- Make sure the variable is created
 
   if (not is_empty(Config.GW_Ip)) and (not is_empty(Config.GW_Port)) then
@@ -826,14 +826,15 @@ end
 
 -- ServiceId: urn:upnp-org:serviceId:tradfri-gw1
 -- Action: SetDebug
-local function setDebugMode(lul_device, newDebugMode)
+local function SetDebugMode(lul_device, newDebugMode)
   if GWDeviceID == lul_device then
-    setLuupVar("Debug", tonumber(newDebugMode) or 0)
+    local debugMode = tonumber(newDebugMode) or 0
+    setLuupVar("Debug", debugMode)
 
-    if (newDebugMode == 1) then
-	  Config.GW_DebugMode=true
+    if (debugMode == 1) then
+	    Config.GW_DebugMode = true
     else
-	  Config.GW_DebugMode=false
+	    Config.GW_DebugMode = false
     end
   end
 end
@@ -841,7 +842,7 @@ end
 -- ServiceId: urn:upnp-org:serviceId:SwitchPower1
 -- Action: SetTarget
 function SwitchPower_SetTarget(lul_device, newTargetValue)
-  newTargetValue = tonumber(newTargetValue)
+  newTargetValue = tonumber(newTargetValue) or 0
 
   local tradfri_id = luup.devices[lul_device].id
   local tradfri_attr_group = Config.GW_Devices[tradfri_id].tradfri_attr_group
