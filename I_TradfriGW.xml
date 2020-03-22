@@ -29,7 +29,7 @@
         </action>
 		<action>
 			<serviceId>urn:upnp-org:serviceId:tradfri-gw1</serviceId>
-			<name>SetDebug</name>
+			<name>SetDebugMode</name>
 			<run>
 			    SetDebugMode(lul_device, lul_settings.newDebugMode)
 			</run>

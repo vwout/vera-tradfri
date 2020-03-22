@@ -507,7 +507,7 @@ local function protect_callback(callback)
   return function(payload)
       local ok, err = pcall(callback, payload)
       if not ok then
-        log("Callback failed: " .. (err or "<Unknown>"))
+        log("CoAP callback failed: " .. (err or "<Unknown>"))
       end
     end
 end
@@ -544,7 +544,7 @@ local function tradfriCommand(method, path, payload, identity, psk)
         coapResult = coap_observer
       end
     else
-      log(string.format("CoAP observe call to %s failed: %s", path_str, coapResult_or_err))
+      log(string.format("CoAP observe call to %s failed: %s", path_str, coapResult_or_err or "<unknown CoAP result"))
     end
   else
     local callback
@@ -563,7 +563,7 @@ local function tradfriCommand(method, path, payload, identity, psk)
       if ok then
         coapResult = coapResult_or_err
       else
-        log(string.format("CoAP get call to %s failed: %s", path_str, coapResult_or_err))
+        log(string.format("CoAP get call to %s failed: %s", path_str, coapResult_or_err or "<unknown CoAP result"))
       end
     elseif method == GW.METHOD_POST then
       local payload_str = payload
@@ -576,7 +576,7 @@ local function tradfriCommand(method, path, payload, identity, psk)
       if ok then
         coapResult = coapResult_or_err
       else
-        log(string.format("CoAP post call to %s failed: %s", path_str, coapResult_or_err))
+        log(string.format("CoAP post call to %s failed: %s", path_str, coapResult_or_err or "<unknown CoAP result"))
       end
     elseif method == GW.METHOD_PUT then
       local payload_str = payload
@@ -589,7 +589,7 @@ local function tradfriCommand(method, path, payload, identity, psk)
       if ok then
         coapResult = coapResult_or_err
       else
-        log(string.format("CoAP post call to %s failed: %s", path_str, coapResult_or_err))
+        log(string.format("CoAP post call to %s failed: %s", path_str, coapResult_or_err or "<unknown CoAP result"))
       end
     else
       log("Unable to process command, method '" .. method .. "' is unknown")
@@ -611,7 +611,7 @@ function tradfriObserveDevice(tradfri_id)
     if (d.coap_observer ~= nil) and (d.coap_observer.listener ~= nil) then
       local ok, err = pcall(function() d.coap_observer.listener:listen() end)
       if not ok then
-        log(string.format("CoAP observer listen call failed for device %s: %s", tradfri_id, err))
+        log(string.format("CoAP observer listen call failed for device %s: %s", tradfri_id, err or "<unknown CoAP result"))
       end
     end
   end
@@ -621,8 +621,8 @@ function tradfriDevicesObserveCallback(payload_str)
   debug("tradfriDevicesObserveCallback " .. payload_str)
   local payload, pos, err = json.decode(payload_str)
   if err then
-    log(string.format("Parsing observed device data failed at %d: %s", pos, err))
-    return false
+    log(string.format("Parsing observed device data '%s' failed at %d with error: %s", payload_str, pos, err or "<Unknown>"))
+    return
   end
 
   local tradfri_id = tostring(payload[GW.ATTR_ID])
@@ -646,8 +646,8 @@ function tradfriDevicesCallback(payload_str)
   debug("tradfriDevicesCallback " .. payload_str)
   local payload, pos, err = json.decode(payload_str)
   if err then
-    log(string.format("Parsing device data failed at %d: %s", pos, err))
-    return false
+    log(string.format("Parsing device data '%s' failed at %d with error: %s", payload_str, pos, err or "<Unknown>"))
+    return
   end
 
   if is_array(payload) then
@@ -717,8 +717,8 @@ function tradfriGatewayCallback(payload_str)
   --debug("tradfriGatewayCallback " .. payload_str)
   local payload, pos, err = json.decode(payload_str)
   if err then
-    log(string.format("Parsing gateway data failed at %d: %s", pos, err))
-    return false
+    log(string.format("Parsing gateway data '%s' failed at %d with error: %s", payload_str, pos, err or "<Unknown>"))
+    return
   end
 
   setLuupVar("Connected", 1)
@@ -825,7 +825,7 @@ function SetCommissioningMode(lul_device, CommissioningTimeout)
 end
 
 -- ServiceId: urn:upnp-org:serviceId:tradfri-gw1
--- Action: SetDebug
+-- Action: SetDebugMode
 local function SetDebugMode(lul_device, newDebugMode)
   if GWDeviceID == lul_device then
     local debugMode = tonumber(newDebugMode) or 0

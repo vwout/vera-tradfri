@@ -105,7 +105,7 @@
               },
               "Command": {
                 "Service": "urn:upnp-org:serviceId:tradfri-gw1",
-                "Action": "SetDebug",
+                "Action": "SetDebugMode",
                 "Parameters": [
                   {
                     "Name": "newDebugMode",
@@ -128,7 +128,7 @@
               },
               "Command": {
                 "Service": "urn:upnp-org:serviceId:tradfri-gw1",
-                "Action": "SetDebug",
+                "Action": "SetDebugMode",
                 "Parameters": [
                   {
                     "Name": "newDebugMode",
