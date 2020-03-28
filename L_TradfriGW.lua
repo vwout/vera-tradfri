@@ -784,13 +784,21 @@ function init(lul_device)
   Config.GW_DebugMode          = getDeviceVar("Debug", 0) == "1"
   getDeviceVar("SecurityCode")  -- Make sure the variable is created
 
+  local ok = false
+  local message = ""
+
   if (not is_empty(Config.GW_Ip)) and (not is_empty(Config.GW_Port)) then
     local initDelay = 5 + math.random(10)
-    log(string.format("Connecting to Tradfri gateway in %d seconds ...", initDelay))
     luup.call_delay("initTradfri", initDelay, "")
+
+    ok = true
+    message = string.format("Connecting to Tradfri gateway in %d seconds ...", initDelay)
   else
-    log("Unable to start the Tradfri plugin. Set the IP(address) attribute.")
+    message = "Unable to start the Tradfri plugin. Set the IP(address) attribute."
   end
+
+  log(message)
+  return ok, message, "Tradfri GW"
 end
 
 
