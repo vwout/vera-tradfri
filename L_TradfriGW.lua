@@ -87,6 +87,14 @@ GW.ATTR_MASTER_TOKEN_TAG = "9036"
 GW.ATTR_MOOD = "9039"
 
 GW.ATTR_NAME = "9001"
+GW.ATTR_NAME_DEFAULTS = {
+  [GW.APPLICATION_TYPE.REMOTE] = "Remote",
+  [GW.APPLICATION_TYPE.LIGHT] = "Light",
+  [GW.APPLICATION_TYPE.OUTLET] = "Outlet",
+  [GW.APPLICATION_TYPE.MOTION] = "Motion",
+  [GW.APPLICATION_TYPE.BLIND] = "Blind",
+}
+
 GW.ATTR_NTP = "9023"
 GW.ATTR_FIRMWARE_VERSION = "9029"
 GW.ATTR_FIRST_SETUP = "9069"
@@ -301,208 +309,6 @@ end
 -- Main logic
 ------------------------------------------------------------------------------------
 
-local function createOrUpdateRemote(payload, child_devices)
-  log("TODO: implement Remote device")
-  return false
-end
-
-local function createOrUpdateLight(payload, child_devices)
-  local tradfri_id = tostring(payload[GW.ATTR_ID])
-  local tradfri_name = payload[GW.ATTR_NAME] or ""
-  local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
-  if tradfri_name == "" then
-    tradfri_name = tradfri_device_info[GW.DEVICE_INFO.NAME] or "Tradfri Light"
-  end
-
-  if tradfri_id and tradfri_name then
-    local device_attrs = payload[GW.ATTR_LIGHT_CONTROL] or {{}}
-    local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
-    local device_dimming = math.ceil(100 * (device_attrs[1][GW.ATTR_LIGHT_DIMMER] or 0) / 254)
-    local mireds = device_attrs[1][GW.ATTR_LIGHT_MIREDS]
-    local color_hex = device_attrs[1][GW.ATTR_LIGHT_COLOR_HEX]
-
-    local variables = {
-        "urn:upnp-org:serviceId:SwitchPower1,Status=" .. tostring(device_state),
-        "urn:upnp-org:serviceId:SwitchPower1,Target=" .. tostring(device_state),
-        "urn:upnp-org:serviceId:Dimming1,LoadLevelStatus=" .. tostring(device_dimming),
-        "urn:upnp-org:serviceId:Dimming1,LoadLevelTarget=" .. tostring(device_dimming),
-        "urn:micasaverde-com:serviceId:Color1,SupportedColors" .. (color_hex and "W,D,R,G,B" or mireds and "W" or "")
-    }
-
-    local data = {
-      tradfri_id = tradfri_id,
-      tradfri_appl_type = GW.APPLICATION_TYPE.LIGHT,
-      tradfri_attr_group = GW.ATTR_LIGHT_CONTROL,
-      tradfri_name = tradfri_name,
-      sid = GWDimmingSID,
-      device_type = (color_hex or mireds) and "urn:schemas-upnp-org:device:DimmableRGBLight:1" or "urn:schemas-upnp-org:device:DimmableLight:1",
-      d_xml = (color_hex or mireds) and "D_DimmableRGBLight1.xml" or "D_DimmableLight1.xml",
-      variables = variables,
-      subcategory = 1,
-      coap_observer = nil
-    }
-
-    Config.GW_Devices[tradfri_id] = data
-  end
-end
-
-local function createOrUpdateOutlet(payload, child_devices)
-  local tradfri_id = tostring(payload[GW.ATTR_ID])
-  local tradfri_name = payload[GW.ATTR_NAME] or ""
-  local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
-  if tradfri_name == "" then
-    tradfri_name = tradfri_device_info[GW.DEVICE_INFO.NAME] or "Tradfri Outlet"
-  end
-
-  if tradfri_id and tradfri_name then
-    local device_attrs = payload[GW.ATTR_SWITCH_PLUG] or {{}}
-    local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
-
-    local data = {
-      tradfri_id = tradfri_id,
-      tradfri_appl_type = GW.APPLICATION_TYPE.OUTLET,
-      tradfri_attr_group = GW.ATTR_SWITCH_PLUG,
-      tradfri_name = tradfri_name,
-      sid = GWSwitchPowerSID,
-      device_type = "urn:schemas-upnp-org:device:BinaryLight:1",
-      d_xml = "D_BinaryLight1.xml",
-      variables = {
-        "urn:upnp-org:serviceId:SwitchPower1,Status=" .. tostring(device_state),
-        "urn:upnp-org:serviceId:SwitchPower1,Target=" .. tostring(device_state),
-      },
-      subcategory = 1,
-      coap_observer = nil
-    }
-
-    Config.GW_Devices[tradfri_id] = data
-  end
-end
-
-local function createOrUpdateMotionSensor(payload, child_devices)
-  log("TODO: implement Motion device")
-  return false
-end
-
-local function createOrUpdateBlind(payload, child_devices)
-  local tradfri_id = tostring(payload[GW.ATTR_ID])
-  local tradfri_name = payload[GW.ATTR_NAME] or ""
-  local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
-  if tradfri_name == "" then
-    tradfri_name = tradfri_device_info[GW.DEVICE_INFO.NAME] or "Tradfri Blind"
-  end
-
-  if tradfri_id and tradfri_name then
-    local device_attrs = payload[GW.ATTR_BLINDS_CONTROL] or {{}}
-    local position = tonumber(device_attrs[1][GW.ATTR_BLIND_CURRENT_POSITION]) or 0
-    position = math.min(math.max(position, 0), 100)
-
-    local data = {
-      tradfri_id = tradfri_id,
-      tradfri_appl_type = GW.APPLICATION_TYPE.BLIND,
-      tradfri_attr_group = GW.ATTR_BLINDS_CONTROL,
-      tradfri_name = tradfri_name,
-      sid = GWBlindSID,
-      device_type = "urn:schemas-micasaverde-com:device:WindowCovering:1",
-      d_xml = "D_WindowCovering1.xml",
-      variables = {
-        "urn:upnp-org:serviceId:Dimming1,LoadLevelStatus=" .. tostring(position),
-        "urn:upnp-org:serviceId:Dimming1,LoadLevelTarget=" .. tostring(position),
-      },
-      subcategory = 1,
-      coap_observer = nil
-    }
-
-    Config.GW_Devices[tradfri_id] = data
-  end
-end
-
-local function setTradfriDeviceVars(payload, lul_device)
-  local last_seen_time = payload[GW.ATTR_LAST_SEEN]
-  if last_seen_time then
-    setLuupVar("LastTimeCheck", last_seen_time, "urn:upnp-org:serviceId:HaDevice1", lul_device)
-  end
-
-  local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
-  local firmware = tradfri_device_info[GW.DEVICE_INFO.FIRMWARE_VERSION]
-  if firmware then
-    setLuupVar("Tradfri_Firmware_Version", firmware, "urn:upnp-org:serviceId:HaDevice1", lul_device)
-  end
-
-  local power_source = tradfri_device_info[GW.DEVICE_INFO.POWER_SOURCES]
-  -- GW.DEVICE_INFO.POWER_SOURCE.INTERNAL_BATTERY and GW.DEVICE_INFO.POWER_SOURCE.EXTERNAL_BATTERY are used for mains-connected outlet
-  if power_source == GW.DEVICE_INFO.POWER_SOURCE.BATTERY then
-    setLuupVar("BatteryLevel", tradfri_device_info[GW.DEVICE_INFO.BATTERY_LEVEL], "urn:upnp-org:serviceId:HaDevice1", lul_device)
-    if last_seen_time then
-      setLuupVar("BatteryDate", last_seen_time, "urn:upnp-org:serviceId:HaDevice1", lul_device)
-    end
-  end
-end
-
-local function setTradfriLightVars(payload, lul_device)
-  local device_attrs = payload[GW.ATTR_LIGHT_CONTROL] or {{}}
-  local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
-  local device_dimming = math.ceil(100 * (device_attrs[1][GW.ATTR_LIGHT_DIMMER] or 0) / 254)
-
-  setLuupVar("LoadLevelTarget", device_dimming, "urn:upnp-org:serviceId:Dimming1", lul_device)
-  setLuupVar("LoadLevelStatus", device_dimming, "urn:upnp-org:serviceId:Dimming1", lul_device)
-  setLuupVar("Target", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
-  setLuupVar("Status", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
-
-  local mireds = device_attrs[1][GW.ATTR_LIGHT_MIREDS]
-  local color_hex = device_attrs[1][GW.ATTR_LIGHT_COLOR_HEX]
-
-  if mireds ~= nil then
-    local w, d = 0, 0
-    -- Source: https://nl.wikipedia.org/wiki/Mired
-    -- Convert Mired to Kelvin
-    local kelvin = math.floor(1000000/mireds)
-    if kelvin < 5450 then
-      w = (math.floor((kelvin-2000) / (3500/255)) + 1) or 0
-    else
-      d = (math.floor((kelvin-5500) / (3500/255)) + 1) or 0
-    end
-
-    setLuupVar("CurrentColor", string.format("0=%d,1=%d", w, d), "urn:micasaverde-com:serviceId:Color1", lul_device)
-    setLuupVar("TargetColor", string.format("0=%d,1=%d", w, d), "urn:micasaverde-com:serviceId:Color1", lul_device)
-  elseif color_hex ~= nil then
-    local w, d, r, g, b = 0, 0, 255, 255, 255
-    r = tonumber(string.sub("f1e0b5", -6, -5), 16) or 0
-    g = tonumber(string.sub("f1e0b5", -4, -3), 16) or 0
-    b = tonumber(string.sub("f1e0b5", -2), 16) or 0
-    setLuupVar("CurrentColor", string.format("0=%d,1=%d,2=%d,3=%d,4=%d", w, d, r, g, b), "urn:micasaverde-com:serviceId:Color1", lul_device)
-    setLuupVar("TargetColor", string.format("0=%d,1=%d,2=%d,3=%d,4=%d", w, d, r, g, b), "urn:micasaverde-com:serviceId:Color1", lul_device)
-
-    -- local supported_colors = {}
-    -- for hex,_ in pairs(GW.LIGHT_COLORS) do
-    --   supported_colors[#supported_colors + 1] = "#" .. hex
-    -- end
-    -- setLuupVar("SupportedColors", table.concat(supported_colors, ","), "urn:micasaverde-com:serviceId:Color1", lul_device)
-  end
-
-  setTradfriDeviceVars(payload, lul_device)
-end
-
-local function setTradfriOutletVars(payload, lul_device)
-  local device_attrs = payload[GW.ATTR_SWITCH_PLUG] or {{}}
-  local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
-
-  setLuupVar("Target", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
-  setLuupVar("Status", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
-
-  setTradfriDeviceVars(payload, lul_device)
-end
-
-local function setTradfriBlindVars(payload, lul_device)
-  local device_attrs = payload[GW.ATTR_BLINDS_CONTROL] or {{}}
-  local position = tonumber(device_attrs[1][GW.ATTR_BLIND_CURRENT_POSITION]) or 0
-  position = math.min(math.max(position, 0), 100)
-
-  setLuupVar("LoadLevelTarget", position, "urn:upnp-org:serviceId:Dimming1", lul_device)
-  setLuupVar("LoadLevelStatus", position, "urn:upnp-org:serviceId:Dimming1", lul_device)
-
-  setTradfriDeviceVars(payload, lul_device)
-end
-
 local function protect_callback(callback)
   return function(payload)
       local ok, err = pcall(callback, payload)
@@ -511,7 +317,6 @@ local function protect_callback(callback)
       end
     end
 end
-
 
 local function tradfriCommand(method, path, payload, identity, psk)
   identity = identity or Config.GW_Identity
@@ -601,6 +406,251 @@ local function tradfriCommand(method, path, payload, identity, psk)
   end
 
   return coapResult
+end
+
+local function trafdri_get_name(appl_type, payload)
+  local tradfri_name = payload[GW.ATTR_NAME] or ""
+  local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
+  if tradfri_name == "" then
+    tradfri_name = tradfri_device_info[GW.DEVICE_INFO.NAME] or ""
+  end
+  if tradfri_name == "" then
+    tradfri_name = "Tradfri " .. (GW.ATTR_NAME_DEFAULTS[appl_type] or "Device")
+  end
+  return tradfri_name
+end
+
+local function createOrUpdateRemote(payload, child_devices)
+  log("TODO: implement Remote device")
+  return false
+end
+
+local function createOrUpdateLight(payload, child_devices)
+  local tradfri_id = tostring(payload[GW.ATTR_ID])
+  local tradfri_name = trafdri_get_name(GW.APPLICATION_TYPE.LIGHT, payload)
+
+  if tradfri_id and tradfri_name then
+    local device_attrs = payload[GW.ATTR_LIGHT_CONTROL] or {{}}
+    local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
+    local device_dimming = math.ceil(100 * (device_attrs[1][GW.ATTR_LIGHT_DIMMER] or 0) / 254)
+    local mireds = device_attrs[1][GW.ATTR_LIGHT_MIREDS]
+    local color_hex = device_attrs[1][GW.ATTR_LIGHT_COLOR_HEX]
+
+    local variables = {
+        "urn:upnp-org:serviceId:SwitchPower1,Status=" .. tostring(device_state),
+        "urn:upnp-org:serviceId:SwitchPower1,Target=" .. tostring(device_state),
+        "urn:upnp-org:serviceId:Dimming1,LoadLevelStatus=" .. tostring(device_dimming),
+        "urn:upnp-org:serviceId:Dimming1,LoadLevelTarget=" .. tostring(device_dimming),
+        "urn:micasaverde-com:serviceId:Color1,SupportedColors" .. (color_hex and "W,D,R,G,B" or mireds and "W" or "")
+    }
+
+    local data = {
+      tradfri_id = tradfri_id,
+      tradfri_appl_type = GW.APPLICATION_TYPE.LIGHT,
+      tradfri_attr_group = GW.ATTR_LIGHT_CONTROL,
+      tradfri_name = tradfri_name,
+      known_name = "",
+      sid = GWDimmingSID,
+      device_type = (color_hex or mireds) and "urn:schemas-upnp-org:device:DimmableRGBLight:1" or "urn:schemas-upnp-org:device:DimmableLight:1",
+      d_xml = (color_hex or mireds) and "D_DimmableRGBLight1.xml" or "D_DimmableLight1.xml",
+      variables = variables,
+      subcategory = 1,
+      coap_observer = nil
+    }
+
+    Config.GW_Devices[tradfri_id] = data
+  end
+end
+
+local function createOrUpdateOutlet(payload, child_devices)
+  local tradfri_id = tostring(payload[GW.ATTR_ID])
+  local tradfri_name = trafdri_get_name(GW.APPLICATION_TYPE.OUTLET, payload)
+
+  if tradfri_id and tradfri_name then
+    local device_attrs = payload[GW.ATTR_SWITCH_PLUG] or {{}}
+    local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
+
+    local data = {
+      tradfri_id = tradfri_id,
+      tradfri_appl_type = GW.APPLICATION_TYPE.OUTLET,
+      tradfri_attr_group = GW.ATTR_SWITCH_PLUG,
+      tradfri_name = tradfri_name,
+      known_name = "",
+      sid = GWSwitchPowerSID,
+      device_type = "urn:schemas-upnp-org:device:BinaryLight:1",
+      d_xml = "D_BinaryLight1.xml",
+      variables = {
+        "urn:upnp-org:serviceId:SwitchPower1,Status=" .. tostring(device_state),
+        "urn:upnp-org:serviceId:SwitchPower1,Target=" .. tostring(device_state),
+      },
+      subcategory = 1,
+      coap_observer = nil
+    }
+
+    Config.GW_Devices[tradfri_id] = data
+  end
+end
+
+local function createOrUpdateMotionSensor(payload, child_devices)
+  log("TODO: implement Motion device")
+  return false
+end
+
+local function createOrUpdateBlind(payload, child_devices)
+  local tradfri_id = tostring(payload[GW.ATTR_ID])
+  local tradfri_name = trafdri_get_name(GW.APPLICATION_TYPE.BLIND, payload)
+
+  if tradfri_id and tradfri_name then
+    local device_attrs = payload[GW.ATTR_BLINDS_CONTROL] or {{}}
+    local position = tonumber(device_attrs[1][GW.ATTR_BLIND_CURRENT_POSITION]) or 0
+    position = math.min(math.max(position, 0), 100)
+
+    local data = {
+      tradfri_id = tradfri_id,
+      tradfri_appl_type = GW.APPLICATION_TYPE.BLIND,
+      tradfri_attr_group = GW.ATTR_BLINDS_CONTROL,
+      tradfri_name = tradfri_name,
+      known_name = "",
+      sid = GWBlindSID,
+      device_type = "urn:schemas-micasaverde-com:device:WindowCovering:1",
+      d_xml = "D_WindowCovering1.xml",
+      variables = {
+        "urn:upnp-org:serviceId:Dimming1,LoadLevelStatus=" .. tostring(position),
+        "urn:upnp-org:serviceId:Dimming1,LoadLevelTarget=" .. tostring(position),
+      },
+      subcategory = 1,
+      coap_observer = nil
+    }
+
+    Config.GW_Devices[tradfri_id] = data
+  end
+end
+
+function tradfriUpdateDeviceName(tradfri_id)
+  local childId,_ = findChild(GWDeviceID, tradfri_id)
+  local d = Config.GW_Devices[tradfri_id]
+  if ((childId ~= nil) and (d ~= nil)) then
+    local payload = {}
+    payload[GW.ATTR_NAME] = d.known_name
+    tradfriCommand(GW.METHOD_PUT, {GW.ROOT_DEVICES, tradfri_id}, payload)
+  end
+end
+
+local function setTradfriDeviceAttrs(payload, lul_device)
+  local tradfri_id = tostring(payload[GW.ATTR_ID])
+  if tradfri_id then
+    local childId,_ = findChild(GWDeviceID, tradfri_id)
+    if (childId ~= nil) then
+      local appl_type = payload[GW.ATTR_APPLICATION_TYPE]
+      local tradfri_name = trafdri_get_name(appl_type, payload)
+
+      local d = Config.GW_Devices[tradfri_id]
+      if (d ~= nil) then
+        d.tradfri_name = tradfri_name
+        if (d.known_name == "") or (d.known_name ~= d.tradfri_name) then
+          d.known_name = d.tradfri_name
+        else
+          local luup_name = luup.attr_get("name", childId)
+          if d.known_name ~= luup_name then
+            d.known_name = luup_name
+            tradfriUpdateDeviceName(tradfri_id)
+            --luup.call_delay("tradfriUpdateDeviceName", 3, tradfri_id)
+          end
+        end
+        setLuupAttr("name", d.known_name, childId)
+      end
+    end
+  end
+end
+
+local function setTradfriDeviceVars(payload, lul_device)
+  local last_seen_time = payload[GW.ATTR_LAST_SEEN]
+  if last_seen_time then
+    setLuupVar("LastTimeCheck", last_seen_time, "urn:upnp-org:serviceId:HaDevice1", lul_device)
+  end
+
+  local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
+  local firmware = tradfri_device_info[GW.DEVICE_INFO.FIRMWARE_VERSION]
+  if firmware then
+    setLuupVar("Tradfri_Firmware_Version", firmware, "urn:upnp-org:serviceId:HaDevice1", lul_device)
+  end
+
+  local power_source = tradfri_device_info[GW.DEVICE_INFO.POWER_SOURCES]
+  -- GW.DEVICE_INFO.POWER_SOURCE.INTERNAL_BATTERY and GW.DEVICE_INFO.POWER_SOURCE.EXTERNAL_BATTERY are used for mains-connected outlet
+  if power_source == GW.DEVICE_INFO.POWER_SOURCE.BATTERY then
+    setLuupVar("BatteryLevel", tradfri_device_info[GW.DEVICE_INFO.BATTERY_LEVEL], "urn:upnp-org:serviceId:HaDevice1", lul_device)
+    if last_seen_time then
+      setLuupVar("BatteryDate", last_seen_time, "urn:upnp-org:serviceId:HaDevice1", lul_device)
+    end
+  end
+end
+
+local function setTradfriLightVars(payload, lul_device)
+  local device_attrs = payload[GW.ATTR_LIGHT_CONTROL] or {{}}
+  local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
+  local device_dimming = math.ceil(100 * (device_attrs[1][GW.ATTR_LIGHT_DIMMER] or 0) / 254)
+
+  setLuupVar("LoadLevelTarget", device_dimming, "urn:upnp-org:serviceId:Dimming1", lul_device)
+  setLuupVar("LoadLevelStatus", device_dimming, "urn:upnp-org:serviceId:Dimming1", lul_device)
+  setLuupVar("Target", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
+  setLuupVar("Status", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
+
+  local mireds = device_attrs[1][GW.ATTR_LIGHT_MIREDS]
+  local color_hex = device_attrs[1][GW.ATTR_LIGHT_COLOR_HEX]
+
+  if mireds ~= nil then
+    local w, d = 0, 0
+    -- Source: https://nl.wikipedia.org/wiki/Mired
+    -- Convert Mired to Kelvin
+    local kelvin = math.floor(1000000/mireds)
+    if kelvin < 5450 then
+      w = (math.floor((kelvin-2000) / (3500/255)) + 1) or 0
+    else
+      d = (math.floor((kelvin-5500) / (3500/255)) + 1) or 0
+    end
+
+    setLuupVar("CurrentColor", string.format("0=%d,1=%d", w, d), "urn:micasaverde-com:serviceId:Color1", lul_device)
+    setLuupVar("TargetColor", string.format("0=%d,1=%d", w, d), "urn:micasaverde-com:serviceId:Color1", lul_device)
+  elseif color_hex ~= nil then
+    local w, d, r, g, b = 0, 0, 255, 255, 255
+    r = tonumber(string.sub("f1e0b5", -6, -5), 16) or 0
+    g = tonumber(string.sub("f1e0b5", -4, -3), 16) or 0
+    b = tonumber(string.sub("f1e0b5", -2), 16) or 0
+    setLuupVar("CurrentColor", string.format("0=%d,1=%d,2=%d,3=%d,4=%d", w, d, r, g, b), "urn:micasaverde-com:serviceId:Color1", lul_device)
+    setLuupVar("TargetColor", string.format("0=%d,1=%d,2=%d,3=%d,4=%d", w, d, r, g, b), "urn:micasaverde-com:serviceId:Color1", lul_device)
+
+    -- local supported_colors = {}
+    -- for hex,_ in pairs(GW.LIGHT_COLORS) do
+    --   supported_colors[#supported_colors + 1] = "#" .. hex
+    -- end
+    -- setLuupVar("SupportedColors", table.concat(supported_colors, ","), "urn:micasaverde-com:serviceId:Color1", lul_device)
+  end
+
+  setTradfriDeviceVars(payload, lul_device)
+  setTradfriDeviceAttrs(payload, lul_device)
+end
+
+local function setTradfriOutletVars(payload, lul_device)
+  local device_attrs = payload[GW.ATTR_SWITCH_PLUG] or {{}}
+  local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
+
+  setLuupVar("Target", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
+  setLuupVar("Status", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
+
+  setTradfriDeviceVars(payload, lul_device)
+  setTradfriDeviceAttrs(payload, lul_device)
+end
+
+local function setTradfriBlindVars(payload, lul_device)
+  local device_attrs = payload[GW.ATTR_BLINDS_CONTROL] or {{}}
+  local position = tonumber(device_attrs[1][GW.ATTR_BLIND_CURRENT_POSITION]) or 0
+  position = math.min(math.max(position, 0), 100)
+
+  setLuupVar("LoadLevelTarget", position, "urn:upnp-org:serviceId:Dimming1", lul_device)
+  setLuupVar("LoadLevelStatus", position, "urn:upnp-org:serviceId:Dimming1", lul_device)
+
+  setTradfriDeviceVars(payload, lul_device)
+  setTradfriDeviceAttrs(payload, lul_device)
 end
 
 function tradfriObserveDevice(tradfri_id)
