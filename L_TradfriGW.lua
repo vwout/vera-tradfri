@@ -217,12 +217,12 @@ local Config = {
 ------------------------------------------------------------------------------------
 
 local function log(message)
-  luup.log("TradfriGW #" .. (GWDeviceID or "?") .. ": " .. (message or ""))
+  luup.log("TradfriGW #" .. (GWDeviceID or "?") .. ": " .. (tostring(message) or ""))
 end
 
 local function debug(message)
   if Config.GW_DebugMode then
-    luup.log("TradfriGW #" .. (GWDeviceID or "?") .. " DEBUG: " .. (message or ""))
+    luup.log("TradfriGW #" .. (GWDeviceID or "?") .. " DEBUG: " .. (tostring(message) or ""))
   end
 end
 
@@ -410,8 +410,8 @@ end
 
 local function trafdri_get_name(appl_type, payload)
   local tradfri_name = payload[GW.ATTR_NAME] or ""
-  local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
   if tradfri_name == "" then
+    local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
     tradfri_name = tradfri_device_info[GW.DEVICE_INFO.NAME] or ""
   end
   if tradfri_name == "" then
@@ -539,28 +539,29 @@ end
 local function setTradfriDeviceAttrs(payload, lul_device)
   local tradfri_id = tostring(payload[GW.ATTR_ID])
   if tradfri_id then
-    local childId,_ = findChild(GWDeviceID, tradfri_id)
-    if (childId ~= nil) then
-      local appl_type = payload[GW.ATTR_APPLICATION_TYPE]
-      local tradfri_name = trafdri_get_name(appl_type, payload)
+    local appl_type = payload[GW.ATTR_APPLICATION_TYPE]
+    local tradfri_name = trafdri_get_name(appl_type, payload)
 
-      local d = Config.GW_Devices[tradfri_id]
-      if (d ~= nil) then
-        d.tradfri_name = tradfri_name
-        if (d.known_name == "") or (d.known_name ~= d.tradfri_name) then
-          d.known_name = d.tradfri_name
-        else
-          local luup_name = luup.attr_get("name", childId)
-          if d.known_name ~= luup_name then
-            d.known_name = luup_name
-            tradfriUpdateDeviceName(tradfri_id)
-            --luup.call_delay("tradfriUpdateDeviceName", 3, tradfri_id)
-          end
+    local d = Config.GW_Devices[tradfri_id]
+    if (d ~= nil) then
+      d.tradfri_name = tradfri_name
+      if (d.known_name == "") or (d.known_name ~= d.tradfri_name) then
+        d.known_name = d.tradfri_name
+      else
+        local luup_name = luup.attr_get("name", lul_device)
+        if d.known_name ~= luup_name then
+          d.known_name = luup_name
+          tradfriUpdateDeviceName(tradfri_id)
+          --luup.call_delay("tradfriUpdateDeviceName", 3, tradfri_id)
         end
-        setLuupAttr("name", d.known_name, childId)
       end
+      setLuupAttr("name", d.known_name, lul_device)
     end
   end
+
+  local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
+  setLuupAttr("manufacturer", tradfri_device_info[GW.DEVICE_INFO.BRAND] or "", lul_device)
+  setLuupAttr("model", tradfri_device_info[GW.DEVICE_INFO.NAME] or "", lul_device)
 end
 
 local function setTradfriDeviceVars(payload, lul_device)
@@ -570,10 +571,8 @@ local function setTradfriDeviceVars(payload, lul_device)
   end
 
   local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
-  local firmware = tradfri_device_info[GW.DEVICE_INFO.FIRMWARE_VERSION]
-  if firmware then
-    setLuupVar("Tradfri_Firmware_Version", firmware, "urn:upnp-org:serviceId:HaDevice1", lul_device)
-  end
+  local firmware_version = tradfri_device_info[GW.DEVICE_INFO.FIRMWARE_VERSION] or ""
+  setLuupVar("Tradfri_Firmware_Version", firmware_version, "urn:upnp-org:serviceId:HaDevice1", lul_device)
 
   local power_source = tradfri_device_info[GW.DEVICE_INFO.POWER_SOURCES]
   -- GW.DEVICE_INFO.POWER_SOURCE.INTERNAL_BATTERY and GW.DEVICE_INFO.POWER_SOURCE.EXTERNAL_BATTERY are used for mains-connected outlet
@@ -693,7 +692,7 @@ function tradfriDevicesObserveCallback(payload_str)
 end
 
 function tradfriDevicesCallback(payload_str)
-  debug("tradfriDevicesCallback " .. payload_str)
+  debug("tradfri Devices Callback " .. payload_str)
   local payload, pos, err = json.decode(payload_str)
   if err then
     log(string.format("Parsing device data '%s' failed at %d with error: %s", payload_str, pos, err or "<Unknown>"))
@@ -764,7 +763,7 @@ function tradfriDevicesCallback(payload_str)
 end
 
 function tradfriGatewayCallback(payload_str)
-  --debug("tradfriGatewayCallback " .. payload_str)
+  debug("tradfri Gateway Callback " .. payload_str)
   local payload, pos, err = json.decode(payload_str)
   if err then
     log(string.format("Parsing gateway data '%s' failed at %d with error: %s", payload_str, pos, err or "<Unknown>"))
@@ -772,17 +771,19 @@ function tradfriGatewayCallback(payload_str)
   end
 
   setLuupVar("Connected", 1)
-
   for k, v in pairs(payload) do
-    if k == GW.ATTR_FIRMWARE_VERSION then
-      setLuupVar("Tradfri_Firmware_Version", v)
-    elseif k == GW.ATTR_PSK then
+    if k == GW.ATTR_PSK then
       Config.GW_Psk = v
       setLuupVar("Psk", v)
     elseif k == GW.ATTR_COMMISSIONING_MODE then
       setLuupVar("Tradfri_Commissioning_Mode", v)
     end
   end
+
+  -- Set common attributes and variables
+  setTradfriDeviceAttrs(payload, GWDeviceID)
+  setTradfriDeviceVars(payload, GWDeviceID)
+
 end
 
 function initTradfri()
@@ -814,7 +815,7 @@ function initTradfri()
 
     -- Load gateway information
     tradfriCommand(GW.METHOD_GET, {GW.ROOT_GATEWAY, GW.ATTR_GATEWAY_INFO})
-    -- TODO: Load devices
+    -- Load devices
     tradfriCommand(GW.METHOD_GET, {GW.ROOT_DEVICES})
   end
 end
