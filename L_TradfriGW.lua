@@ -551,8 +551,12 @@ local function setTradfriDeviceAttrs(payload, lul_device)
         local luup_name = luup.attr_get("name", lul_device)
         if d.known_name ~= luup_name then
           d.known_name = luup_name
-          tradfriUpdateDeviceName(tradfri_id)
-          --luup.call_delay("tradfriUpdateDeviceName", 3, tradfri_id)
+
+          -- Call action to start asynchronic name update job
+          local args = {
+            newName = luup_name
+          }
+          luup.call_action("urn:upnp-org:serviceId:tradfri-gw1", "SetDeviceName", args, lul_device)
         end
       end
       setLuupAttr("name", d.known_name, lul_device)
@@ -895,6 +899,19 @@ local function SetDebugMode(lul_device, newDebugMode)
     else
 	    Config.GW_DebugMode = false
     end
+  end
+end
+
+-- ServiceId: urn:upnp-org:serviceId:tradfri-gw1
+-- Action: SetDeviceName
+local function SetDeviceName(lul_device, newName)
+  local tradfri_id = luup.devices[lul_device].id
+  if tradfri_id and newName then
+    local d = Config.GW_Devices[tradfri_id]
+    if (d ~= nil) then
+      d.tradfri_name = newName
+    end
+    setLuupAttr("name", d.known_name, lul_device)
   end
 end
 

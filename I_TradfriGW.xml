@@ -34,6 +34,17 @@
 			    SetDebugMode(lul_device, lul_settings.newDebugMode)
 			</run>
 		</action>
+		<action>
+			<serviceId>urn:upnp-org:serviceId:tradfri-gw1</serviceId>
+			<name>SetDeviceName</name>
+			<job>
+                local tradfri_id = luup.devices[lul_device].id
+                if tradfri_id then
+			      SetDeviceName(lul_device, lul_settings.newName)
+                  tradfriUpdateDeviceName(tradfri_id)
+                end
+			</job>
+		</action>
         <action>
             <serviceId>urn:upnp-org:serviceId:SwitchPower1</serviceId>
             <name>SetTarget</name>
