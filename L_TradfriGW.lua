@@ -3,8 +3,8 @@ local coap = require("coap")
 
 ------------------------------------------------------------------------------------
 -- Tradfri constants
+-- Source: com/ikea/tradfri/lighting/ipso/IPSOObjects
 ------------------------------------------------------------------------------------
-
 local GW = {}
 GW.METHOD_GET = 1
 GW.METHOD_POST = 2
@@ -34,6 +34,7 @@ GW.APPLICATION_TYPE.LIGHT = 2
 GW.APPLICATION_TYPE.OUTLET = 3
 GW.APPLICATION_TYPE.MOTION = 4
 GW.APPLICATION_TYPE.BLIND = 7
+GW.APPLICATION_TYPE.SOUND_CONTROLLER = 8
 
 GW.ATTR_BLIND_CURRENT_POSITION = "5536"
 GW.ATTR_BLIND_TRIGGER = "5523"
@@ -93,6 +94,7 @@ GW.ATTR_NAME_DEFAULTS = {
   [GW.APPLICATION_TYPE.OUTLET] = "Outlet",
   [GW.APPLICATION_TYPE.MOTION] = "Motion",
   [GW.APPLICATION_TYPE.BLIND] = "Blind",
+  [GW.APPLICATION_TYPE.SOUND_CONTROLLER] = "Sound Controller",
 }
 
 GW.ATTR_NTP = "9023"
@@ -186,6 +188,11 @@ GW.ATTR_TIME_START_TIME_MINUTE = "9047"
 GW.ATTR_TRANSITION_TIME = "5712"
 
 GW.ATTR_USE_CURRENT_LIGHT_SETTINGS = "9070"
+
+GW.ATTR_SOUND_CONTROLLER = "15018"
+GW.ATTR_PLAYER_SETTING = "15017"
+GW.ATTR_VOLUME = "9117"
+
 
 ---
 -- ServiceId strings for the different sensors
@@ -421,7 +428,7 @@ local function trafdri_get_name(appl_type, payload)
 end
 
 local function createOrUpdateRemote(payload, child_devices)
-  log("TODO: implement Remote device")
+  log("Remote devices are not supported")
   return false
 end
 
@@ -492,7 +499,7 @@ local function createOrUpdateOutlet(payload, child_devices)
 end
 
 local function createOrUpdateMotionSensor(payload, child_devices)
-  log("TODO: implement Motion device")
+  log("Motion devices are not supported")
   return false
 end
 
@@ -525,6 +532,12 @@ local function createOrUpdateBlind(payload, child_devices)
     Config.GW_Devices[tradfri_id] = data
   end
 end
+
+local function createOrUpdateSoundController(payload, child_devices)
+  log("Sound Controller device are not supported")
+  return false
+end
+
 
 function tradfriUpdateDeviceName(tradfri_id)
   local childId,_ = findChild(GWDeviceID, tradfri_id)
@@ -758,6 +771,8 @@ function tradfriDevicesCallback(payload_str)
           createOrUpdateMotionSensor(payload, child_devices)
         elseif v == GW.APPLICATION_TYPE.BLIND then
           createOrUpdateBlind(payload, child_devices)
+        elseif v == GW.APPLICATION_TYPE.SOUND_CONTROLLER then
+          createOrUpdateSoundController(payload, child_devices)
         else
           log(string.format("Unknown device type received (%d): %s", v, payload_str))
         end
