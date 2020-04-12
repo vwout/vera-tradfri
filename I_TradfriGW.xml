@@ -24,7 +24,7 @@
             <serviceId>urn:upnp-org:serviceId:tradfri-gw1</serviceId>
             <name>SetCommissioningMode</name>
             <run>
-                SetCommissioningMode(lul_device, lul_settings.commissioning_timeout)
+                SetCommissioningMode(lul_device, lul_settings.CommissioningTimeout)
             </run>
         </action>
 		<action>
