@@ -814,7 +814,7 @@ function initTradfri()
 
       if (not is_empty(securityCode)) then
         if (is_empty(Config.GW_Identity)) then
-          Config.GW_Identity = string.format("Vera-%s", luup.pk_accesspoint)
+          Config.GW_Identity = string.format("Vera-%s-%s", luup.pk_accesspoint, GWDeviceID)
           setLuupVar("Identity", Config.GW_Identity)
         end
 
@@ -844,7 +844,7 @@ end
 function init(lul_device)
   GWDeviceID = lul_device
 
-  log("Starting up with ID " .. luup.devices[GWDeviceID].id)
+  log(string.format("Starting up device %s with ID %s", GWDeviceID, luup.devices[GWDeviceID].id))
   setLuupVar("Connected", 0)
 
   Config.GW_Ip                 = luup.devices[GWDeviceID].ip
