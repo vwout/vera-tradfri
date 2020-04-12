@@ -577,8 +577,14 @@ local function setTradfriDeviceAttrs(payload, lul_device)
   end
 
   local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
-  setLuupAttr("manufacturer", tradfri_device_info[GW.DEVICE_INFO.BRAND] or "", lul_device)
-  setLuupAttr("model", tradfri_device_info[GW.DEVICE_INFO.NAME] or "", lul_device)
+  local manufacturer = tradfri_device_info[GW.DEVICE_INFO.BRAND]
+  if manufacturer then
+    setLuupAttr("manufacturer", manufacturer, lul_device)
+  end
+  local model = tradfri_device_info[GW.DEVICE_INFO.NAME]
+  if model then
+    setLuupAttr("model", model, lul_device)
+  end
 end
 
 local function setTradfriDeviceVars(payload, lul_device)
@@ -588,8 +594,10 @@ local function setTradfriDeviceVars(payload, lul_device)
   end
 
   local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
-  local firmware_version = tradfri_device_info[GW.DEVICE_INFO.FIRMWARE_VERSION] or ""
-  setLuupVar("Tradfri_Firmware_Version", firmware_version, "urn:upnp-org:serviceId:HaDevice1", lul_device)
+  local firmware_version = tradfri_device_info[GW.DEVICE_INFO.FIRMWARE_VERSION]
+  if firmware_version then
+    setLuupVar("Tradfri_Firmware_Version", firmware_version, "urn:upnp-org:serviceId:HaDevice1", lul_device)
+  end
 
   local power_source = tradfri_device_info[GW.DEVICE_INFO.POWER_SOURCES]
   -- GW.DEVICE_INFO.POWER_SOURCE.INTERNAL_BATTERY and GW.DEVICE_INFO.POWER_SOURCE.EXTERNAL_BATTERY are used for mains-connected outlet
