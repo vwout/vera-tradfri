@@ -19,6 +19,9 @@ These directly control linked devices, so only the effect of an action on a remo
 - Lookup the SecurityCode on the bottom for your Tradfri Gateway and enter the code in the corresponding variable of the created device 
 - Restart Luup and your devices should appear after a short while. The `SecurityCode` attribute will be cleared after successful authentication to the gateway.
 
+At startup or Luup reload, the gateway device icon will show with a red outline.
+After a short while (5-20 seconds) the outline becomes black, which means a connection is established with the gateway.
+
 ## Limitations
 This plugin relies on [CoAP](https://en.wikipedia.org/wiki/Constrained_Application_Protocol), the protocol that the IKEA Tradfri gateway uses.
 The Lua configuration that ships with Vera does not include support for this.
