@@ -1,3 +1,23 @@
+--  This program is free software: you can redistribute it and/or modify
+--  it under the terms of the GNU General Public License as published by
+--  the Free Software Foundation, either version 3 of the License, or
+--  (at your option) any later version.
+--
+--  This program is distributed in the hope that it will be useful,
+--  but WITHOUT ANY WARRANTY; without even the implied warranty of
+--  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+--  GNU General Public License for more details.
+--
+--  You should have received a copy of the GNU General Public License
+--  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ABOUT = {
+  NAME        = "TradfriGW",
+  VERSION     = "0.2.0",
+  DESCRIPTION = "A plugin for Vera to control IKEA Tradfri devices via a Tradfri gateway",
+  AUTHOR      = "@vwout",
+  REPOSITORY  = "https://github.com/vwout/vera-tradfri",
+}
+
 local json = require("dkjson")
 local coap = require("coap")
 
@@ -224,12 +244,12 @@ local Config = {
 ------------------------------------------------------------------------------------
 
 local function log(message)
-  luup.log("TradfriGW #" .. (GWDeviceID or "?") .. ": " .. (tostring(message) or ""))
+  luup.log(ABOUT.NAME .. " #" .. (GWDeviceID or "?") .. ": " .. (tostring(message) or ""))
 end
 
 local function debug(message)
   if Config.GW_DebugMode then
-    luup.log("TradfriGW #" .. (GWDeviceID or "?") .. " DEBUG: " .. (tostring(message) or ""))
+    luup.log(ABOUT.NAME .. " #" .. (GWDeviceID or "?") .. " DEBUG: " .. (tostring(message) or ""))
   end
 end
 
@@ -854,6 +874,7 @@ function init(lul_device)
 
   log(string.format("Starting up device %s with ID %s", GWDeviceID, luup.devices[GWDeviceID].id))
   setLuupVar("Connected", 0)
+  setLuupVar("Version", ABOUT.VERSION)
 
   Config.GW_Ip                 = luup.devices[GWDeviceID].ip
   Config.GW_Port               = tonumber(getDeviceVar("Port", Config.GW_Port, 1025, 65535))
@@ -876,7 +897,7 @@ function init(lul_device)
   end
 
   log(message)
-  return ok, message, "Tradfri GW"
+  return ok, message, ABOUT.NAME
 end
 
 

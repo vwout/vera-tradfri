@@ -22,6 +22,18 @@ These directly control linked devices, so only the effect of an action on a remo
 At startup or Luup reload, the gateway device icon will show with a red outline.
 After a short while (5-20 seconds) the outline becomes black, which means a connection is established with the gateway.
 
+## Control Panel
+Besides setting the Tradfri Gateway IP address and `SecurityCode`, no configuration is needed.
+The Control Panel tab of the device that represents the gateway offers several advanced functions:
+- *Reboot*: Will reboot the Tradfri Gateway (the hardware device, not this plugin).
+- *Factory Reset*: Will request a factory reset of the Tradfri Gateway. 
+  This will reset the gateway hardware to the factory defaults. All connected devices will be removed and will require linking again.
+- *Commission*: Will put the Tradfri Gateway in device commissioning mode to link a new device (typically a remote).
+- *Debugging*: Activate debug logging for the plugin
+- *Update devices* (poll or observe): The default behavior of the plugin (as of version 0.2) is to poll the Tradfri Gateway regularly for the status of the connected devices. 
+  The Tradfri Gateway also supports observing via CoAP. 
+  This however is an experimental feature that is not always very stable. Using observe may cause regular reboots. 
+
 ## Limitations
 This plugin relies on [CoAP](https://en.wikipedia.org/wiki/Constrained_Application_Protocol), the protocol that the IKEA Tradfri gateway uses.
 The Lua configuration that ships with Vera does not include support for this.
@@ -29,4 +41,4 @@ For now, this plugin is supported for use with openLuup with AltUI as available 
 To use this plugin on a random Linux system, install the Lua library [libcoap](https://github.com/vwout/luacoap) as Debian package: [luacoap-lua5.x-0.2.0-Linux.deb](https://github.com/vwout/luacoap/blob/master/downloads/).
 
 ## Known issues
-None
+- Instability when using observe for device updates
