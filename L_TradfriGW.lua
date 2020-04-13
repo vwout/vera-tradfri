@@ -230,13 +230,14 @@ local GWDeviceType        = "urn:schemas-upnp-org:device:tradfri-gw:1"
 -- 'global' program variables assigned in init()
 local GWDeviceID   -- Luup device ID
 local Config = {
-  GW_Ip          = "",
-  GW_Port        = 5684,
-  GW_Identity    = "",
-  GW_Psk         = "",
-  GW_DebugMode   = false,
-  GW_ObserveMode = 0,
-  GW_Devices     = {},
+  GW_Ip           = "",
+  GW_Port         = 5684,
+  GW_Identity     = "",
+  GW_Psk          = "",
+  GW_DebugMode    = false,
+  GW_ObserveMode  = 0,
+  GW_PollInterval = 30,
+  GW_Devices      = {},
 }
 
 
@@ -431,6 +432,9 @@ local function tradfriCommand(method, path, payload, identity, psk)
     if coapResult ~= nil then
       log(string.format("CoAP call to gateway failed with error: %d", coapResult))
     end
+
+    -- Explicitly close CoAP client
+    coapClient = nil
   end
 
   return coapResult
@@ -726,7 +730,7 @@ end
 
 function tradfriPollDevices()
   if Config.GW_ObserveMode == 0 then
-    luup.call_delay("tradfriPollDevices", 300, "")
+    luup.call_delay("tradfriPollDevices", Config.GW_PollInterval, "")
 
     for k, d in pairs(Config.GW_Devices) do
       tradfriCommand(GW.METHOD_GET, {GW.ROOT_DEVICES, d.tradfri_id})
@@ -868,7 +872,18 @@ function tradfriGatewayCallback(payload_str)
   -- Set common attributes and variables
   setTradfriDeviceAttrs(payload, GWDeviceID)
   setTradfriDeviceVars(payload, GWDeviceID)
+end
 
+function deviceVariableUpdate(lul_device, lul_service, lul_variable, lul_value_old, lul_value_new)
+  if GWDeviceID == lul_device then
+    if lul_variable == "Debug" then
+      SetDebugMode(lul_device, lul_value_new)
+    elseif lul_variable == "ObserveMode" then
+      SetObserveMode(lul_device, lul_value_new)
+    elseif lul_variable == "PollInterval" then
+      Config.GW_PollInterval = tonumber(lul_value_new) or Config.GW_PollInterval
+    end
+  end
 end
 
 function initTradfri()
@@ -905,7 +920,6 @@ function initTradfri()
   end
 end
 
-
 -- init() called on startup as specified in I_TradfriGW.xml
 function init(lul_device)
   GWDeviceID = lul_device
@@ -919,8 +933,11 @@ function init(lul_device)
   Config.GW_Identity           = getLuupVar("Identity")
   Config.GW_Psk                = getDeviceVar("Psk", "")
   Config.GW_DebugMode          = getDeviceVar("Debug", 0) == "1"
-  Config.GW_ObserveMode        = tonumber(getDeviceVar("ObserveMode", 0))
+  Config.GW_ObserveMode        = tonumber(getDeviceVar("ObserveMode", Config.GW_ObserveMode))
+  Config.GW_PollInterval       = tonumber(getDeviceVar("PollInterval", Config.GW_PollInterval))
   getDeviceVar("SecurityCode")  -- Make sure the variable is created
+
+  luup.variable_watch("deviceVariableUpdate", GWDeviceSID, nil, GWDeviceID)
 
   local ok = false
   local message = ""
@@ -930,9 +947,9 @@ function init(lul_device)
     luup.call_delay("initTradfri", initDelay, "")
 
     ok = true
-    message = string.format("Connecting to Tradfri gateway in %d seconds ...", initDelay)
+    message = string.format("Connecting to Tradfri gateway in %d seconds.", initDelay)
   else
-    message = "Unable to start the Tradfri plugin. Set the IP(address) attribute."
+    message = "Unable to start the Tradfri plugin. Set the IP(address) attribute and reload Luup."
   end
 
   log(message)
@@ -972,7 +989,7 @@ end
 
 -- ServiceId: urn:upnp-org:serviceId:tradfri-gw1
 -- Action: SetObserveMode
-local function SetObserveMode(lul_device, newObserveMode)
+function SetObserveMode(lul_device, newObserveMode)
   if GWDeviceID == lul_device then
     local observeMode = tonumber(newObserveMode) or 0
 
@@ -984,7 +1001,7 @@ end
 
 -- ServiceId: urn:upnp-org:serviceId:tradfri-gw1
 -- Action: SetDebugMode
-local function SetDebugMode(lul_device, newDebugMode)
+function SetDebugMode(lul_device, newDebugMode)
   if GWDeviceID == lul_device then
     local debugMode = tonumber(newDebugMode) or 0
 
@@ -999,7 +1016,7 @@ end
 
 -- ServiceId: urn:upnp-org:serviceId:tradfri-gw1
 -- Action: SetDeviceName
-local function SetDeviceName(lul_device, newName)
+function SetDeviceName(lul_device, newName)
   local tradfri_id = luup.devices[lul_device].id
   if tradfri_id and newName then
     local d = Config.GW_Devices[tradfri_id]

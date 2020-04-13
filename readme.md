@@ -31,6 +31,7 @@ The Control Panel tab of the device that represents the gateway offers several a
 - *Commission*: Will put the Tradfri Gateway in device commissioning mode to link a new device (typically a remote).
 - *Debugging*: Activate debug logging for the plugin
 - *Update devices* (poll or observe): The default behavior of the plugin (as of version 0.2) is to poll the Tradfri Gateway regularly for the status of the connected devices. 
+  The polling frequency is configurable via the device variable `PollInterval`, it specifies the poll interval in seconds.
   The Tradfri Gateway also supports observing via CoAP. 
   This however is an experimental feature that is not always very stable. Using observe may cause regular reboots. 
 
