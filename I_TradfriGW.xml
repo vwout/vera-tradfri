@@ -29,6 +29,13 @@
         </action>
 		<action>
 			<serviceId>urn:upnp-org:serviceId:tradfri-gw1</serviceId>
+			<name>SetObserveMode</name>
+			<run>
+			    SetObserveMode(lul_device, lul_settings.newObserveMode)
+			</run>
+		</action>
+		<action>
+			<serviceId>urn:upnp-org:serviceId:tradfri-gw1</serviceId>
 			<name>SetDebugMode</name>
 			<run>
 			    SetDebugMode(lul_device, lul_settings.newDebugMode)

@@ -230,12 +230,13 @@ local GWDeviceType        = "urn:schemas-upnp-org:device:tradfri-gw:1"
 -- 'global' program variables assigned in init()
 local GWDeviceID   -- Luup device ID
 local Config = {
-  GW_Ip         = "",
-  GW_Port       = 5684,
-  GW_Identity   = "",
-  GW_Psk        = "",
-  GW_DebugMode  = false,
-  GW_Devices    = {},
+  GW_Ip          = "",
+  GW_Port        = 5684,
+  GW_Identity    = "",
+  GW_Psk         = "",
+  GW_DebugMode   = false,
+  GW_ObserveMode = 0,
+  GW_Devices     = {},
 }
 
 
@@ -697,7 +698,7 @@ local function setTradfriBlindVars(payload, lul_device)
   setTradfriDeviceAttrs(payload, lul_device)
 end
 
-function tradfriObserveDevice(tradfri_id)
+function tradfriStartObserveDevice(tradfri_id)
   if tradfri_id and Config.GW_Devices[tradfri_id] ~= nil then
     local d = Config.GW_Devices[tradfri_id]
 
@@ -708,6 +709,47 @@ function tradfriObserveDevice(tradfri_id)
         log(string.format("CoAP observer listen call failed for device %s: %s", tradfri_id, err or "<unknown CoAP result"))
       end
     end
+  end
+end
+
+local function tradfriStopObserveDevice(tradfri_id)
+  if tradfri_id and Config.GW_Devices[tradfri_id] ~= nil then
+    local d = Config.GW_Devices[tradfri_id]
+    if (d.coap_observer ~= nil) and (d.coap_observer.listener ~= nil) then
+      pcall(function() d.coap_observer.listener:stop() end)
+      d.coap_observer.listener = nil
+      d.coap_observer.client = nil
+    end
+    d.coap_observer = nil
+  end
+end
+
+function tradfriPollDevices()
+  if Config.GW_ObserveMode == 0 then
+    luup.call_delay("tradfriPollDevices", 300, "")
+
+    for k, d in pairs(Config.GW_Devices) do
+      tradfriCommand(GW.METHOD_GET, {GW.ROOT_DEVICES, d.tradfri_id})
+    end
+  end
+end
+
+local function tradfriStartStopObservations()
+  local cnt = 1
+  for k, d in pairs(Config.GW_Devices) do
+    if Config.GW_ObserveMode == 1 then
+      local observeDelay = cnt
+      debug(string.format("Start observing tradfri device %s in %d seconds", d.tradfri_id, observeDelay))
+      luup.call_delay("tradfriStartObserveDevice", observeDelay, d.tradfri_id)
+
+      cnt = cnt + 1
+    else
+      tradfriStopObserveDevice(d.tradfri_id)
+    end
+  end
+
+  if Config.GW_ObserveMode == 0 then
+    luup.call_delay("tradfriPollDevices", 3, "")
   end
 end
 
@@ -774,18 +816,14 @@ function tradfriDevicesCallback(payload_str)
 
     luup.chdev.sync(GWDeviceID, child_devices)
 
-    local cnt = 1
     for k, d in pairs(Config.GW_Devices) do
       local childId,_ = findChild(GWDeviceID, d.tradfri_id)
       if (childId ~= nil) then
           setLuupAttr("subcategory_num", d.subcategory or 0, childId)
       end
-
-      local observeDelay = cnt
-      debug(string.format("Start observing tradfri device %s in %d seconds", d.tradfri_id, observeDelay))
-      luup.call_delay("tradfriObserveDevice", observeDelay, d.tradfri_id)
-      cnt = cnt + 1
     end
+
+    tradfriStartStopObservations()
   else
     for k, v in pairs(payload) do
       if k == GW.ATTR_APPLICATION_TYPE then
@@ -881,6 +919,7 @@ function init(lul_device)
   Config.GW_Identity           = getLuupVar("Identity")
   Config.GW_Psk                = getDeviceVar("Psk", "")
   Config.GW_DebugMode          = getDeviceVar("Debug", 0) == "1"
+  Config.GW_ObserveMode        = tonumber(getDeviceVar("ObserveMode", 0))
   getDeviceVar("SecurityCode")  -- Make sure the variable is created
 
   local ok = false
@@ -932,17 +971,29 @@ function SetCommissioningMode(lul_device, CommissioningTimeout)
 end
 
 -- ServiceId: urn:upnp-org:serviceId:tradfri-gw1
+-- Action: SetObserveMode
+local function SetObserveMode(lul_device, newObserveMode)
+  if GWDeviceID == lul_device then
+    local observeMode = tonumber(newObserveMode) or 0
+
+    Config.GW_ObserveMode = observeMode
+    setLuupVar("ObserveMode", observeMode)
+    tradfriStartStopObservations()
+  end
+end
+
+-- ServiceId: urn:upnp-org:serviceId:tradfri-gw1
 -- Action: SetDebugMode
 local function SetDebugMode(lul_device, newDebugMode)
   if GWDeviceID == lul_device then
     local debugMode = tonumber(newDebugMode) or 0
-    setLuupVar("Debug", debugMode)
 
     if (debugMode == 1) then
 	    Config.GW_DebugMode = true
     else
 	    Config.GW_DebugMode = false
     end
+    setLuupVar("Debug", debugMode)
   end
 end
 

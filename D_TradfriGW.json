@@ -109,7 +109,7 @@
                 "Parameters": [
                   {
                     "Name": "newDebugMode",
-                    "Value": "0"
+                    "Value": "1"
                   }
                 ]
               },
@@ -132,11 +132,84 @@
                 "Parameters": [
                   {
                     "Name": "newDebugMode",
-                    "Value": "1"
+                    "Value": "0"
                   }
                 ]
               },
               "ControlCode": "debug_off"
+            }
+          ]
+        },
+        {
+          "ControlType": "label",
+          "top": "0",
+          "left": "0",
+          "text_align": "left",
+          "Label": {
+            "lang_tag": "observe_label",
+            "text": "Update devices:"
+          },
+          "Display": {
+            "Top": 10,
+            "Left": 250,
+            "Width": 50,
+            "Height": 20
+          }
+        },
+        {
+          "ControlType": "multi_state_button",
+          "top": "0",
+          "left": "0",
+          "Display": {
+            "Top": 30,
+            "Left": 250
+          },
+          "states": [
+            {
+              "Label": {
+                "lang_tag": "observe_on",
+                "text": "Observe"
+              },
+              "ControlGroup": "1",
+              "Display": {
+                "Service": "urn:upnp-org:serviceId:tradfri-gw1",
+                "Variable": "ObserveMode",
+                "Value": "1"
+              },
+              "Command": {
+                "Service": "urn:upnp-org:serviceId:tradfri-gw1",
+                "Action": "SetObserveMode",
+                "Parameters": [
+                  {
+                    "Name": "newObserveMode",
+                    "Value": "1"
+                  }
+                ]
+              },
+              "ControlCode": "observe_on"
+            },
+            {
+              "Label": {
+                "lang_tag": "observe_off",
+                "text": "Poll"
+              },
+              "ControlGroup": "1",
+              "Display": {
+                "Service": "urn:upnp-org:serviceId:tradfri-gw1",
+                "Variable": "ObserveMode",
+                "Value": "0"
+              },
+              "Command": {
+                "Service": "urn:upnp-org:serviceId:tradfri-gw1",
+                "Action": "SetObserveMode",
+                "Parameters": [
+                  {
+                    "Name": "newObserveMode",
+                    "Value": "0"
+                  }
+                ]
+              },
+              "ControlCode": "observe_off"
             }
           ]
         },

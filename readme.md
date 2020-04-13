@@ -6,7 +6,7 @@ The following devices are supported:
 - Outlet (power plug)
 - Blind (experimental, not test on real device)
 
-Due to technical limitations of the Tradfri system, it is not possible to capture events of a remote control, motion sensor or dimmer.
+Due to technical limitations of the Tradfri system, it is not possible to capture events of a remote control, motion sensor, dimmer or sound controller.
 These directly control linked devices, so only the effect of an action on a remote can be observed when a light or outlet state changes. 
 
 ## Installation
