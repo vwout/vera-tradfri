@@ -452,12 +452,12 @@ local function trafdri_get_name(appl_type, payload)
   return tradfri_name
 end
 
-local function createOrUpdateRemote(payload, child_devices)
+local function createTradfriRemoteDevice(payload)
   log("Remote devices are not supported")
   return false
 end
 
-local function createOrUpdateLight(payload, child_devices)
+local function createTradfriLightDevice(payload)
   local tradfri_id = tostring(payload[GW.ATTR_ID])
   local tradfri_name = trafdri_get_name(GW.APPLICATION_TYPE.LIGHT, payload)
 
@@ -494,7 +494,7 @@ local function createOrUpdateLight(payload, child_devices)
   end
 end
 
-local function createOrUpdateOutlet(payload, child_devices)
+local function createTradfriOutletDevice(payload)
   local tradfri_id = tostring(payload[GW.ATTR_ID])
   local tradfri_name = trafdri_get_name(GW.APPLICATION_TYPE.OUTLET, payload)
 
@@ -523,12 +523,12 @@ local function createOrUpdateOutlet(payload, child_devices)
   end
 end
 
-local function createOrUpdateMotionSensor(payload, child_devices)
+local function createTradfriMotionDevice(payload)
   log("Motion devices are not supported")
   return false
 end
 
-local function createOrUpdateBlind(payload, child_devices)
+local function createTradfriBlindsDevice(payload)
   local tradfri_id = tostring(payload[GW.ATTR_ID])
   local tradfri_name = trafdri_get_name(GW.APPLICATION_TYPE.BLIND, payload)
 
@@ -558,13 +558,13 @@ local function createOrUpdateBlind(payload, child_devices)
   end
 end
 
-local function createOrUpdateSoundController(payload, child_devices)
+local function createTradfriSoundControllerDevice(payload)
   log("Sound Controller device are not supported")
   return false
 end
 
 
-function tradfriUpdateDeviceName(tradfri_id)
+function updateTradfriDeviceName(tradfri_id)
   local childId,_ = findChild(GWDeviceID, tradfri_id)
   local d = Config.GW_Devices[tradfri_id]
   if ((childId ~= nil) and (d ~= nil)) then
@@ -634,7 +634,7 @@ local function setTradfriDeviceVars(payload, lul_device)
   end
 end
 
-local function setTradfriLightVars(payload, lul_device)
+local function updateTradfriLightDevice(payload, lul_device)
   local device_attrs = payload[GW.ATTR_LIGHT_CONTROL] or {{}}
   local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
   local device_dimming = math.ceil(100 * (device_attrs[1][GW.ATTR_LIGHT_DIMMER] or 0) / 254)
@@ -679,7 +679,7 @@ local function setTradfriLightVars(payload, lul_device)
   setTradfriDeviceAttrs(payload, lul_device)
 end
 
-local function setTradfriOutletVars(payload, lul_device)
+local function updateTradfriOutletDevice(payload, lul_device)
   local device_attrs = payload[GW.ATTR_SWITCH_PLUG] or {{}}
   local device_state = device_attrs[1][GW.ATTR_DEVICE_STATE] or 0
 
@@ -690,7 +690,7 @@ local function setTradfriOutletVars(payload, lul_device)
   setTradfriDeviceAttrs(payload, lul_device)
 end
 
-local function setTradfriBlindVars(payload, lul_device)
+local function updateTradfriBlindsDevice(payload, lul_device)
   local device_attrs = payload[GW.ATTR_BLINDS_CONTROL] or {{}}
   local position = tonumber(device_attrs[1][GW.ATTR_BLIND_CURRENT_POSITION]) or 0
   position = math.min(math.max(position, 0), 100)
@@ -757,14 +757,7 @@ local function tradfriStartStopObservations()
   end
 end
 
-function tradfriDevicesObserveCallback(payload_str)
-  debug("tradfriDevicesObserveCallback " .. payload_str)
-  local payload, pos, err = json.decode(payload_str)
-  if err then
-    log(string.format("Parsing observed device data '%s' failed at %d with error: %s", payload_str, pos, err or "<Unknown>"))
-    return
-  end
-
+local function createOrUpdateTradfriDevice(payload)
   local tradfri_id = tostring(payload[GW.ATTR_ID])
   if tradfri_id and Config.GW_Devices[tradfri_id] ~= nil then
     local d = Config.GW_Devices[tradfri_id]
@@ -772,14 +765,45 @@ function tradfriDevicesObserveCallback(payload_str)
     if (childId ~= nil) then
       local device_attrs = payload[d.tradfri_attr_group] or {{}}
       if d.tradfri_appl_type == GW.APPLICATION_TYPE.LIGHT then
-        setTradfriLightVars(payload, childId)
+        updateTradfriLightDevice(payload, childId)
       elseif d.tradfri_appl_type == GW.APPLICATION_TYPE.OUTLET then
-        setTradfriOutletVars(payload, childId)
+        updateTradfriOutletDevice(payload, childId)
       elseif d.tradfri_appl_type == GW.APPLICATION_TYPE.BLIND then
-        setTradfriBlindVars(payload, childId)
+        updateTradfriBlindsDevice(payload, childId)
+      end
+    end
+  else
+    for k, v in pairs(payload) do
+      if k == GW.ATTR_APPLICATION_TYPE then
+        if v == GW.APPLICATION_TYPE.REMOTE then
+          createTradfriRemoteDevice(payload)
+        elseif v == GW.APPLICATION_TYPE.LIGHT then
+          createTradfriLightDevice(payload)
+        elseif v == GW.APPLICATION_TYPE.OUTLET then
+          createTradfriOutletDevice(payload)
+        elseif v == GW.APPLICATION_TYPE.MOTION then
+          createTradfriMotionDevice(payload)
+        elseif v == GW.APPLICATION_TYPE.BLIND then
+          createTradfriBlindsDevice(payload)
+        elseif v == GW.APPLICATION_TYPE.SOUND_CONTROLLER then
+          createTradfriSoundControllerDevice(payload)
+        else
+          log(string.format("Unknown device type received (%d): %s", v, payload_str))
+        end
       end
     end
   end
+end
+
+function tradfriDevicesObserveCallback(payload_str)
+  debug("tradfri Devices Observe Callback " .. payload_str)
+  local payload, pos, err = json.decode(payload_str)
+  if err then
+    log(string.format("Parsing observed device data '%s' failed at %d with error: %s", payload_str, pos, err or "<Unknown>"))
+    return
+  end
+
+  createOrUpdateTradfriDevice(payload)
 end
 
 function tradfriDevicesCallback(payload_str)
@@ -802,8 +826,6 @@ function tradfriDevicesCallback(payload_str)
 
     local child_devices = luup.chdev.start(GWDeviceID);
     for _, d in pairs(Config.GW_Devices) do
-      -- debug("Add " .. d.tradfri_name .. " (" .. d.tradfri_id .. "), vars=" .. table.concat(d.variables, "\n"))
-
       luup.chdev.append(
         GWDeviceID,
         child_devices,
@@ -829,25 +851,7 @@ function tradfriDevicesCallback(payload_str)
 
     tradfriStartStopObservations()
   else
-    for k, v in pairs(payload) do
-      if k == GW.ATTR_APPLICATION_TYPE then
-        if v == GW.APPLICATION_TYPE.REMOTE then
-          createOrUpdateRemote(payload, child_devices)
-        elseif v == GW.APPLICATION_TYPE.LIGHT then
-          createOrUpdateLight(payload, child_devices)
-        elseif v == GW.APPLICATION_TYPE.OUTLET then
-          createOrUpdateOutlet(payload, child_devices)
-        elseif v == GW.APPLICATION_TYPE.MOTION then
-          createOrUpdateMotionSensor(payload, child_devices)
-        elseif v == GW.APPLICATION_TYPE.BLIND then
-          createOrUpdateBlind(payload, child_devices)
-        elseif v == GW.APPLICATION_TYPE.SOUND_CONTROLLER then
-          createOrUpdateSoundController(payload, child_devices)
-        else
-          log(string.format("Unknown device type received (%d): %s", v, payload_str))
-        end
-      end
-    end
+    createOrUpdateTradfriDevice(payload)
   end
 end
 
@@ -1040,7 +1044,7 @@ function SwitchPower_SetTarget(lul_device, newTargetValue)
     local payload = {}
     payload[tradfri_attr_group] = {attrs}
     tradfriCommand(GW.METHOD_PUT, {GW.ROOT_DEVICES, tradfri_id}, payload)
-    setTradfriOutletVars(payload, lul_device)
+    updateTradfriOutletDevice(payload, lul_device)
   end
 end
 
@@ -1060,14 +1064,14 @@ function Dimming_SetLoadLevelTarget(lul_device, newLoadlevelTarget)
       local payload = {}
       payload[tradfri_attr_group] = {attrs}
       tradfriCommand(GW.METHOD_PUT, {GW.ROOT_DEVICES, tradfri_id}, payload)
-      setTradfriLightVars(payload, lul_device)
+      updateTradfriLightDevice(payload, lul_device)
     elseif tradfri_attr_group == GW.ATTR_BLINDS_CONTROL then
       local attrs = {}
       attrs[GW.ATTR_BLIND_CURRENT_POSITION] = newLoadlevelTarget
       local payload = {}
       payload[tradfri_attr_group] = {attrs}
       tradfriCommand(GW.METHOD_PUT, {GW.ROOT_DEVICES, tradfri_id}, payload)
-      setTradfriBlindVars(payload, lul_device)
+      updateTradfriBlindsDevice(payload, lul_device)
     else
       log(string.format("SetLoadLevelTarget not supported for attribute %s for tradfri device %s", tradfri_attr_group, tradfri_id))
     end
@@ -1117,7 +1121,7 @@ function Color_SetColor(lul_device, newColorTarget)
       local payload = {}
       payload[tradfri_attr_group] = {attrs}
       tradfriCommand(GW.METHOD_PUT, {GW.ROOT_DEVICES, tradfri_id}, payload)
-      setTradfriLightVars(payload, lul_device)
+      updateTradfriLightDevice(payload, lul_device)
     end
   end
 end

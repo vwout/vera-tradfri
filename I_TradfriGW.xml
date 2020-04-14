@@ -48,7 +48,7 @@
                 local tradfri_id = luup.devices[lul_device].id
                 if tradfri_id then
 			      SetDeviceName(lul_device, lul_settings.newName)
-                  tradfriUpdateDeviceName(tradfri_id)
+                  updateTradfriDeviceName(tradfri_id)
                 end
 			</job>
 		</action>
