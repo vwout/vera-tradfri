@@ -43,3 +43,5 @@ To use this plugin on a random Linux system, install the Lua library [libcoap](h
 
 ## Known issues
 - Instability when using observe for device updates
+- Polling many device on a short interval (less than 10 seconds) may cause issues on devices with a low limit on the maximum number of open files (less than 1024), e.g. a Raspberry Pi.
+  The solution is to increase this by adding e.g. `fs.file-max=4096` to `/etc/sysctl.conf`. 
