@@ -29,6 +29,13 @@
         </action>
 		<action>
 			<serviceId>urn:upnp-org:serviceId:tradfri-gw1</serviceId>
+			<name>SetAddRooms</name>
+			<run>
+			    SetAddRooms(lul_device, lul_settings.newAddRooms)
+			</run>
+		</action>
+		<action>
+			<serviceId>urn:upnp-org:serviceId:tradfri-gw1</serviceId>
 			<name>SetObserveMode</name>
 			<run>
 			    SetObserveMode(lul_device, lul_settings.newObserveMode)
