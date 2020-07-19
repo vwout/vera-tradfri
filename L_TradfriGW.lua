@@ -246,6 +246,7 @@ local Config = {
   --
   GroupsUpdatePending   = false,
   GroupsUpdateTriggered = 0,
+  PollCoroutine         = nil,
 }
 
 
@@ -876,14 +877,30 @@ local function tradfriStopObserveDevice(tradfri_id)
   end
 end
 
+function _tradfriPollDevicesInternalCo()
+  if Config.PollCoroutine ~= nil then
+    if coroutine.resume(Config.PollCoroutine) then
+      luup.call_delay("_tradfriPollDevicesInternalCo", 0, "")
+    else
+      Config.PollCoroutine = nil
+    end
+  end
+end
+
 function tradfriPollDevices()
   if Config.GW_ObserveMode == 0 then
     if Config.GW_PollInterval > 0 then
       luup.call_delay("tradfriPollDevices", Config.GW_PollInterval, "")
     end
 
-    for _, d in pairs(Config.GW_Devices) do
-      tradfriCommand(GW.METHOD_GET, {d.root_device or GW.ROOT_DEVICES, d.tradfri_id})
+    if Config.PollCoroutine == nil then
+      Config.PollCoroutine = coroutine.create(function()
+        for _, d in pairs(Config.GW_Devices) do
+          tradfriCommand(GW.METHOD_GET, {d.root_device or GW.ROOT_DEVICES, d.tradfri_id})
+          coroutine.yield()
+        end
+      end)
+      luup.call_delay("_tradfriPollDevicesInternalCo", 0, "")
     end
   end
 end
