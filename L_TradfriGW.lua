@@ -1316,7 +1316,31 @@ end
 -- ServiceId: urn:upnp-org:serviceId:HaDevice1
 -- Action: ToggleState
 function HaDevice_ToggleState(lul_device)
-  log(string.format("TODO HaDevice_ToggleState: for device %d", lul_device))
+  if luup.devices[lul_device] then
+    local tradfri_id = luup.devices[lul_device].id
+    local d = Config.GW_Devices[tradfri_id]
+    local tradfri_attr_group = d.tradfri_attr_group
+    if tradfri_id and d and tradfri_attr_group then
+      if tradfri_attr_group == GW.ATTR_LIGHT_CONTROL or tradfri_attr_group == GW.ATTR_SWITCH_PLUG then
+        local device_state = getLuupVar("Status", "urn:upnp-org:serviceId:SwitchPower1", d.luup_id) == "1"
+        local attrs = {}
+        attrs[GW.ATTR_DEVICE_STATE] = device_state and 0 or 1
+        local payload = {}
+        if d.root_device == GW.ROOT_GROUPS then
+          payload = attrs
+          updateTradfriGroup(payload, lul_device)
+        else
+          payload[tradfri_attr_group] = {attrs}
+          updateTradfriOutletDevice(payload, lul_device)
+        end
+        tradfriCommand(GW.METHOD_PUT, {d.root_device or GW.ROOT_DEVICES, tradfri_id}, payload)
+      else
+        log(string.format("ToggleState not supported for attribute %s for tradfri device %s", tradfri_attr_group, tradfri_id))
+      end
+    end
+  else
+    log(string.format("Error toggling state for HaDevice target, device %s is not available.", tostring(lul_device)))
+  end
 end
 
 -- ServiceId: urn:upnp-org:serviceId:Color1
