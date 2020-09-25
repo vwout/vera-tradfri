@@ -852,9 +852,8 @@ local function updateTradfriBlindsDevice(payload, lul_device)
 end
 
 function tradfriStartObserveDevice(tradfri_id)
-  if tradfri_id and Config.GW_Devices[tradfri_id] ~= nil then
-    local d = Config.GW_Devices[tradfri_id]
-
+  local d = Config.GW_Devices[tradfri_id]
+  if tradfri_id and d ~= nil then
     d.coap_observer = tradfriCommand(GW.METHOD_OBSERVE, {d.root_device or GW.ROOT_DEVICES, tradfri_id})
     if (d.coap_observer ~= nil) and (d.coap_observer.listener ~= nil) then
       local ok, err = pcall(function() d.coap_observer.listener:listen() end)
@@ -866,8 +865,8 @@ function tradfriStartObserveDevice(tradfri_id)
 end
 
 local function tradfriStopObserveDevice(tradfri_id)
-  if tradfri_id and Config.GW_Devices[tradfri_id] ~= nil then
-    local d = Config.GW_Devices[tradfri_id]
+  local d = Config.GW_Devices[tradfri_id]
+  if tradfri_id and d ~= nil then
     if (d.coap_observer ~= nil) and (d.coap_observer.listener ~= nil) then
       pcall(function() d.coap_observer.listener:stop() end)
       d.coap_observer.listener = nil
@@ -927,8 +926,8 @@ end
 local function createOrUpdateTradfriDevice(payload)
   local success = true
   local tradfri_id = tostring(payload[GW.ATTR_ID])
-  if tradfri_id and Config.GW_Devices[tradfri_id] ~= nil then
-    local d = Config.GW_Devices[tradfri_id]
+  local d = Config.GW_Devices[tradfri_id]
+  if tradfri_id and d ~= nil then
     local childId,_ = findChild(GWDeviceID, d.tradfri_id)
     if (childId ~= nil) then
       success = true
@@ -970,8 +969,8 @@ end
 
 local function createOrUpdateTradfriGroup(payload)
   local tradfri_id = tostring(payload[GW.ATTR_ID])
-  if tradfri_id and Config.GW_Devices[tradfri_id] ~= nil then
-    local d = Config.GW_Devices[tradfri_id]
+  local d = Config.GW_Devices[tradfri_id]
+  if tradfri_id and d ~= nil then
     local childId,_ = findChild(GWDeviceID, d.tradfri_id)
     if (childId ~= nil) then
       updateTradfriGroup(payload, childId)
@@ -1265,8 +1264,7 @@ function SwitchPower_SetTarget(lul_device, newTargetValue)
   if luup.devices[lul_device] then
     local tradfri_id = luup.devices[lul_device].id
     local d = Config.GW_Devices[tradfri_id]
-    local tradfri_attr_group = d.tradfri_attr_group
-    if tradfri_id and d and tradfri_attr_group then
+    if tradfri_id and d ~= nil and d.tradfri_attr_group then
       local attrs = {}
       attrs[GW.ATTR_DEVICE_STATE] = newTargetValue
       local payload = {}
@@ -1274,7 +1272,7 @@ function SwitchPower_SetTarget(lul_device, newTargetValue)
         payload = attrs
         updateTradfriGroup(payload, lul_device)
       else
-        payload[tradfri_attr_group] = {attrs}
+        payload[d.tradfri_attr_group] = {attrs}
         updateTradfriOutletDevice(payload, lul_device)
       end
       tradfriCommand(GW.METHOD_PUT, {d.root_device or GW.ROOT_DEVICES, tradfri_id}, payload)
@@ -1302,7 +1300,7 @@ function Dimming_SetLoadLevelTarget(lul_device, newLoadlevelTarget)
       if d.root_device == GW.ROOT_GROUPS then
         payload = attrs
         updateTradfriGroup(payload, lul_device)
-    else
+      else
         payload[tradfri_attr_group] = {attrs}
         updateTradfriLightDevice(payload, lul_device)
       end
