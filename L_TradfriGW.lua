@@ -12,7 +12,7 @@
 --  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ABOUT = {
   NAME        = "TradfriGW",
-  VERSION     = "0.3.0",
+  VERSION     = "0.4.0",
   DESCRIPTION = "A plugin for Vera to control IKEA Tradfri devices via a Tradfri gateway",
   AUTHOR      = "@vwout",
   REPOSITORY  = "https://github.com/vwout/vera-tradfri",
