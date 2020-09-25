@@ -219,6 +219,7 @@ GW.ATTR_VOLUME = "9117"
 ---
 -- ServiceId strings for the different sensors
 local GWDeviceSID         = "urn:upnp-org:serviceId:tradfri-gw1"             -- Main device serviceId
+local GWHaDeviceSID       = "urn:upnp-org:serviceId:HaDevice1"
 local GWSwitchPowerSID    = "urn:upnp-org:serviceId:SwitchPower1"
 local GWDimmingSID        = "urn:upnp-org:serviceId:Dimming1"
 local GWColorSID          = "urn:micasaverde-com:serviceId:Color1"
@@ -663,21 +664,21 @@ end
 local function setTradfriDeviceVars(payload, lul_device)
   local last_seen_time = payload[GW.ATTR_LAST_SEEN]
   if last_seen_time then
-    setLuupVar("LastTimeCheck", last_seen_time, "urn:upnp-org:serviceId:HaDevice1", lul_device)
+    setLuupVar("LastTimeCheck", last_seen_time, GWHaDeviceSID, lul_device)
   end
 
   local tradfri_device_info = payload[GW.ATTR_DEVICE_INFO] or {}
   local firmware_version = tradfri_device_info[GW.DEVICE_INFO.FIRMWARE_VERSION]
   if firmware_version then
-    setLuupVar("Tradfri_Firmware_Version", firmware_version, "urn:upnp-org:serviceId:HaDevice1", lul_device)
+    setLuupVar("Tradfri_Firmware_Version", firmware_version, GWDeviceSID, lul_device)
   end
 
   local power_source = tradfri_device_info[GW.DEVICE_INFO.POWER_SOURCES]
   -- GW.DEVICE_INFO.POWER_SOURCE.INTERNAL_BATTERY and GW.DEVICE_INFO.POWER_SOURCE.EXTERNAL_BATTERY are used for mains-connected outlet
   if power_source == GW.DEVICE_INFO.POWER_SOURCE.BATTERY then
-    setLuupVar("BatteryLevel", tradfri_device_info[GW.DEVICE_INFO.BATTERY_LEVEL], "urn:upnp-org:serviceId:HaDevice1", lul_device)
+    setLuupVar("BatteryLevel", tradfri_device_info[GW.DEVICE_INFO.BATTERY_LEVEL], GWHaDeviceSID, lul_device)
     if last_seen_time then
-      setLuupVar("BatteryDate", last_seen_time, "urn:upnp-org:serviceId:HaDevice1", lul_device)
+      setLuupVar("BatteryDate", last_seen_time, GWHaDeviceSID, lul_device)
     end
   end
 end
@@ -707,8 +708,8 @@ function calculateTradfriGroupStatus_internal()
             local child = Config.GW_Devices[tostring(child_id)]
             if child ~= nil then
               if child.luup_id ~= nil then
-                device_state = device_state or getLuupVar("Status", "urn:upnp-org:serviceId:SwitchPower1", child.luup_id) == "1"
-                local dimming = getLuupVar("LoadLevelStatus", "urn:upnp-org:serviceId:Dimming1", child.luup_id)
+                device_state = device_state or getLuupVar("Status", GWSwitchPowerSID, child.luup_id) == "1"
+                local dimming = getLuupVar("LoadLevelStatus", GWDimmingSID, child.luup_id)
                 if dimming ~= nil then
                   device_dimming = device_dimming or 0 + dimming
                   dimming_devices = dimming_devices + 1
@@ -718,12 +719,12 @@ function calculateTradfriGroupStatus_internal()
           end
 
           if device_dimming ~= nil then
-            --setLuupVar("LoadLevelTarget", math.floor(device_dimming / dimming_devices), "urn:upnp-org:serviceId:Dimming1", d.luup_id)
-            setLuupVar("LoadLevelStatus", math.floor(device_dimming / dimming_devices), "urn:upnp-org:serviceId:Dimming1", d.luup_id)
+            --setLuupVar("LoadLevelTarget", math.floor(device_dimming / dimming_devices), GWDimmingSID, d.luup_id)
+            setLuupVar("LoadLevelStatus", math.floor(device_dimming / dimming_devices), GWDimmingSID, d.luup_id)
           end
           if device_state ~= nil then
-            --setLuupVar("Target", device_state and 1 or 0, "urn:upnp-org:serviceId:SwitchPower1", d.luup_id)
-            setLuupVar("Status", device_state and 1 or 0, "urn:upnp-org:serviceId:SwitchPower1", d.luup_id)
+            --setLuupVar("Target", device_state and 1 or 0, GWSwitchPowerSID, d.luup_id)
+            setLuupVar("Status", device_state and 1 or 0, GWSwitchPowerSID, d.luup_id)
           end
         end
       end
@@ -754,10 +755,10 @@ local function updateTradfriGroup(payload, lul_device)
     --
     -- local device_state = payload[GW.ATTR_DEVICE_STATE] or 0
     -- local device_dimming = math.ceil(100 * (payload[GW.ATTR_LIGHT_DIMMER] or 0) / 254)
-    -- changed = changed or setLuupVar("LoadLevelTarget", device_dimming, "urn:upnp-org:serviceId:Dimming1", lul_device)
-    -- changed = changed or setLuupVar("LoadLevelStatus", device_dimming, "urn:upnp-org:serviceId:Dimming1", lul_device)
-    -- changed = changed or setLuupVar("Target", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
-    -- changed = changed or setLuupVar("Status", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
+    -- changed = changed or setLuupVar("LoadLevelTarget", device_dimming, GWDimmingSID, lul_device)
+    -- changed = changed or setLuupVar("LoadLevelStatus", device_dimming, GWDimmingSID, lul_device)
+    -- changed = changed or setLuupVar("Target", device_state, GWSwitchPowerSID, lul_device)
+    -- changed = changed or setLuupVar("Status", device_state, GWSwitchPowerSID, lul_device)
 
     if changed then
       calculateTradfriGroupStatus()
@@ -774,10 +775,10 @@ local function updateTradfriLightDevice(payload, lul_device)
   local device_dimming = math.ceil(100 * (device_attrs[1][GW.ATTR_LIGHT_DIMMER] or 0) / 254)
 
   local changed = false
-  --changed = changed or setLuupVar("LoadLevelTarget", device_dimming, "urn:upnp-org:serviceId:Dimming1", lul_device)
-  changed = changed or setLuupVar("LoadLevelStatus", device_dimming, "urn:upnp-org:serviceId:Dimming1", lul_device)
-  --changed = changed or setLuupVar("Target", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
-  changed = changed or setLuupVar("Status", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
+  --changed = changed or setLuupVar("LoadLevelTarget", device_dimming, GWDimmingSID, lul_device)
+  changed = changed or setLuupVar("LoadLevelStatus", device_dimming, GWDimmingSID, lul_device)
+  --changed = changed or setLuupVar("Target", device_state, GWSwitchPowerSID, lul_device)
+  changed = changed or setLuupVar("Status", device_state, GWSwitchPowerSID, lul_device)
 
   local mireds = device_attrs[1][GW.ATTR_LIGHT_MIREDS]
   local color_hex = device_attrs[1][GW.ATTR_LIGHT_COLOR_HEX]
@@ -793,21 +794,21 @@ local function updateTradfriLightDevice(payload, lul_device)
       d = (math.floor((kelvin-5500) / (3500/255)) + 1) or 0
     end
 
-    changed = changed or setLuupVar("CurrentColor", string.format("0=%d,1=%d", w, d), "urn:micasaverde-com:serviceId:Color1", lul_device)
-    --changed = changed or setLuupVar("TargetColor", string.format("0=%d,1=%d", w, d), "urn:micasaverde-com:serviceId:Color1", lul_device)
+    changed = changed or setLuupVar("CurrentColor", string.format("0=%d,1=%d", w, d), GWColorSID, lul_device)
+    --changed = changed or setLuupVar("TargetColor", string.format("0=%d,1=%d", w, d), GWColorSID, lul_device)
   elseif color_hex ~= nil then
     local w, d, r, g, b = 0, 0, 255, 255, 255
     r = tonumber(string.sub("f1e0b5", -6, -5), 16) or 0
     g = tonumber(string.sub("f1e0b5", -4, -3), 16) or 0
     b = tonumber(string.sub("f1e0b5", -2), 16) or 0
-    changed = changed or setLuupVar("CurrentColor", string.format("0=%d,1=%d,2=%d,3=%d,4=%d", w, d, r, g, b), "urn:micasaverde-com:serviceId:Color1", lul_device)
-    --changed = changed or setLuupVar("TargetColor", string.format("0=%d,1=%d,2=%d,3=%d,4=%d", w, d, r, g, b), "urn:micasaverde-com:serviceId:Color1", lul_device)
+    changed = changed or setLuupVar("CurrentColor", string.format("0=%d,1=%d,2=%d,3=%d,4=%d", w, d, r, g, b), GWColorSID, lul_device)
+    --changed = changed or setLuupVar("TargetColor", string.format("0=%d,1=%d,2=%d,3=%d,4=%d", w, d, r, g, b), GWColorSID, lul_device)
 
     -- local supported_colors = {}
     -- for hex,_ in pairs(GW.LIGHT_COLORS) do
     --   supported_colors[#supported_colors + 1] = "#" .. hex
     -- end
-    -- setLuupVar("SupportedColors", table.concat(supported_colors, ","), "urn:micasaverde-com:serviceId:Color1", lul_device)
+    -- setLuupVar("SupportedColors", table.concat(supported_colors, ","), GWColorSID, lul_device)
   end
 
   if changed then
@@ -823,8 +824,8 @@ local function updateTradfriOutletDevice(payload, lul_device)
   local device_state = tostring(device_attrs[1][GW.ATTR_DEVICE_STATE] or 0)
   local changed = false
 
-  --changed = changed or setLuupVar("Target", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
-  changed = changed or setLuupVar("Status", device_state, "urn:upnp-org:serviceId:SwitchPower1", lul_device)
+  --changed = changed or setLuupVar("Target", device_state, GWSwitchPowerSID, lul_device)
+  changed = changed or setLuupVar("Status", device_state, GWSwitchPowerSID, lul_device)
 
   if changed then
     calculateTradfriGroupStatus()
@@ -840,8 +841,8 @@ local function updateTradfriBlindsDevice(payload, lul_device)
   position = math.min(math.max(position, 0), 100)
   local changed = false
 
-  --changed = changed or setLuupVar("LoadLevelTarget", position, "urn:upnp-org:serviceId:Dimming1", lul_device)
-  changed = changed or setLuupVar("LoadLevelStatus", position, "urn:upnp-org:serviceId:Dimming1", lul_device)
+  --changed = changed or setLuupVar("LoadLevelTarget", position, GWDimmingSID, lul_device)
+  changed = changed or setLuupVar("LoadLevelStatus", position, GWDimmingSID, lul_device)
 
   if changed then
     calculateTradfriGroupStatus()
@@ -1327,7 +1328,7 @@ function HaDevice_ToggleState(lul_device)
     local tradfri_attr_group = d.tradfri_attr_group
     if tradfri_id and d and tradfri_attr_group then
       if tradfri_attr_group == GW.ATTR_LIGHT_CONTROL or tradfri_attr_group == GW.ATTR_SWITCH_PLUG then
-        local device_state = getLuupVar("Status", "urn:upnp-org:serviceId:SwitchPower1", d.luup_id) == "1"
+        local device_state = getLuupVar("Status", GWSwitchPowerSID, d.luup_id) == "1"
         local attrs = {}
         attrs[GW.ATTR_DEVICE_STATE] = device_state and 0 or 1
         local payload = {}
