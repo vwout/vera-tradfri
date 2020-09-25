@@ -1054,29 +1054,36 @@ function deviceVariableUpdate(lul_device, lul_service, lul_variable, lul_value_o
 end
 
 local function syncLuupDevices()
-  local child_devices = luup.chdev.start(GWDeviceID)
-  for _, d in pairs(Config.GW_Devices) do
-    luup.chdev.append(
-      GWDeviceID,
-      child_devices,
-      d.tradfri_id,                     -- child id (is altid)
-      d.tradfri_name,                   -- child device description
-      d.device_type,                    -- child device type
-      d.d_xml,                          -- child D-xml file
-      "",                               -- child I-xml file
-      table.concat(d.variables, "\n"),  -- child variables
-      false,                            -- not embedded, child is standalone device
-      false                             -- invisible
-    )
+  local cnt = 0
+  for _ in pairs(Config.GW_Devices) do
+    cnt = cnt + 1
   end
 
-  luup.chdev.sync(GWDeviceID, child_devices)
+  if cnt > 0 then
+    local child_devices = luup.chdev.start(GWDeviceID)
+    for _, d in pairs(Config.GW_Devices) do
+      luup.chdev.append(
+        GWDeviceID,
+        child_devices,
+        d.tradfri_id,                     -- child id (is altid)
+        d.tradfri_name,                   -- child device description
+        d.device_type,                    -- child device type
+        d.d_xml,                          -- child D-xml file
+        "",                               -- child I-xml file
+        table.concat(d.variables, "\n"),  -- child variables
+        false,                            -- not embedded, child is standalone device
+        false                             -- invisible
+      )
+    end
 
-  for k, d in pairs(Config.GW_Devices) do
-    local childId,_ = findChild(GWDeviceID, d.tradfri_id)
-    if (childId ~= nil) then
-        d.luup_id = childId
-        setLuupAttr("subcategory_num", d.subcategory or 0, childId)
+    luup.chdev.sync(GWDeviceID, child_devices)
+
+    for k, d in pairs(Config.GW_Devices) do
+      local childId,_ = findChild(GWDeviceID, d.tradfri_id)
+      if (childId ~= nil) then
+          d.luup_id = childId
+          setLuupAttr("subcategory_num", d.subcategory or 0, childId)
+      end
     end
   end
 end
